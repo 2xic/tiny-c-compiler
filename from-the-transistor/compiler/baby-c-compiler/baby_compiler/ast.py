@@ -25,6 +25,10 @@ class Tokenizer:
             "/",
             "*",
             "+",
+            "-",
+            "~",
+            "&",
+            "|"
         ]
         self.tokens = self._get_tokens(source_code)
 
@@ -170,6 +174,16 @@ class MathOp(Nodes):
             expr_2
         ]
 
+class VariableAssignment(Nodes):
+    def __init__(self, v_reference, v_value) -> None:
+        super().__init__()
+        self.v_reference = v_reference
+        self.v_value = v_value
+        self.child_nodes = [
+            v_reference,
+            v_value
+        ]
+
 class NumericValue(Nodes):
     def __init__(self, value) -> None:
         super().__init__()
@@ -187,6 +201,8 @@ class AST:
         self.types = {
             "int": TypeDefinition("int")
         }
+        # Need to reconsider this... Is this how we want to create the tree?
+        self.variables = {}
         self.tokens_index = TokenConsumer(self.tokens)
 
     def build_ast(self):
@@ -248,7 +264,7 @@ class AST:
             while found_token:
                 for create_node in [
                     self.get_return_definition,
-                    self.get_variable_assignment
+                    self.get_variable_declaration_or_assignment,
                 ]:                    
                     local_check_point = self.tokens_index.index
                     node_definition = create_node()
@@ -264,22 +280,39 @@ class AST:
                 return body                
         return None
     
-    def get_variable_assignment(self):
+    def get_variable_declaration_or_assignment(self):
         type_value = self.tokens_index.get_token()
         if type_value in self.types:
             name = self.tokens_index.get_token()
             if name.isalnum():
-                if self.tokens_index.get_token() == "=":
+                if self.tokens_index.is_peek_token("="):
                     math_expression = self.get_math_expression()
                     if self.tokens_index.get_token() == ";" and math_expression is not None:
                         # variable initiation
+                        self.variables[name] = True
                         return VariableDeclaration(
                             TypeDefinition(type_value),
                             name,
                             math_expression
                         )
+                elif self.tokens_index.is_peek_token(";"):
+                    self.variables[name] = True
+                    return VariableDeclaration(
+                        TypeDefinition(type_value),
+                        name,
+                        None
+                    )
+        elif type_value in self.variables:
+            # This is an assignment ... 
+            if self.tokens_index.is_peek_token("="):
+                math_expression = self.get_math_expression()
+                if self.tokens_index.get_token() == ";" and math_expression is not None:
+                    return VariableAssignment(
+                        type_value,
+                        math_expression,
+                    )
         return None
-
+    
     def get_return_definition(self):
         if self.tokens_index.get_token() == "return":
             value = self.tokens_index.get_token()
@@ -297,9 +330,6 @@ class AST:
                     return ReturnDefinition(value)
         return None
     
-    def get_expression(self):
-        pass
-
     def get_math_expression(self):
         # How do we best evaluate this ? 
         value_1 = self.tokens_index.get_token()

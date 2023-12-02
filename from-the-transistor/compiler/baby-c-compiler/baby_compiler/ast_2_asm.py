@@ -1,7 +1,7 @@
 """
 We got nice AST output, we need nice output :)
 """
-from .ast import File, FunctionDefinition, ReturnDefinition, FunctionBody, VariableDeclaration, NumericValue, MathOp
+from .ast import File, FunctionDefinition, ReturnDefinition, FunctionBody, VariableDeclaration, NumericValue, MathOp, VariableAssignment
 
 
 def create_sys_exit(exit_code):
@@ -71,6 +71,10 @@ _start:
                 self.output_asm.append(
                     f"\t\tmovl %eax, {node.name}"
                 )
+            elif node.value is None:
+                self.data_sections.append(
+                    f"\t{node.name}: .word 0"
+                )
             else:
                 self.data_sections.append(
                     f"\t{node.name}: .word {node.value}"
@@ -92,14 +96,24 @@ _start:
             The add opcode from assembly is like this
             ADD immediate value to a register
             """
-            # We write to EAX
+            # We write to EAX, but should be able to do more dynamic allocations soonish
             self.output_asm.append(f"\t\taddl ${node.expr_1}, %eax")
             if isinstance(node.expr_2, NumericValue):
                 self.output_asm.append(f"\t\taddl ${node.expr_2}, %eax")
             else:
-                self.convert_nodes(node.expr_2)            
+                self.convert_nodes(node.expr_2)
+        elif isinstance(node, VariableAssignment):
+            if isinstance(node.v_value, NumericValue):
+                self.output_asm.append(
+                    f"\t\tmovl ${node.v_value.value}, {node.v_reference}"
+                )
+            elif isinstance(node.v_value, MathOp):
+                self.convert_nodes(node.v_value)
+                self.output_asm.append(
+                    f"\t\tmovl %eax, {node.v_reference}"
+                )
+            else:
+                raise Exception("I did not implement math expressions here yet")
         else:
            
             raise Exception("Unknown node " + str(node))    
-
-
