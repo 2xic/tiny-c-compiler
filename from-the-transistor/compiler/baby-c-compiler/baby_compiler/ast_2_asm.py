@@ -1,11 +1,11 @@
 """
 We got nice AST output, we need nice output :)
 """
-from .ast import File, FunctionDefinition, ReturnDefinition, FunctionBody, VariableDeclaration
+from .ast import File, FunctionDefinition, ReturnDefinition, FunctionBody, VariableDeclaration, NumericValue, MathOp
 
 
 def create_sys_exit(exit_code):
-    if exit_code.isnumeric():
+    if isinstance(exit_code, NumericValue):
         return f"""
         movl    ${exit_code}, %ebx
         movl    $1, %eax
@@ -59,15 +59,45 @@ _start:
         elif isinstance(node, VariableDeclaration):
             # TODO: Doing this just because it is easier to deal with
             # Likely we should do some stack allocations etc depending on context 
-            self.data_sections.append(
-                f"\t{node.name}: .word {node.value}"
-            )
+            if isinstance(node.value, MathOp):
+                self.data_sections.append(
+                    f"\t{node.name}: .word 0"
+                )
+                # THen we store this into the .data value ? 
+                self.output_asm.append(
+                    f"\t\txor %eax, %eax"
+                )
+                self.convert_nodes(node.value) 
+                self.output_asm.append(
+                    f"\t\tmovl %eax, {node.name}"
+                )
+            else:
+                self.data_sections.append(
+                    f"\t{node.name}: .word {node.value}"
+                )
         elif isinstance(node, FunctionBody):
             for i in node.child_nodes:
                 self.convert_nodes(i)
         elif isinstance(node, ReturnDefinition):
             # technically it should only be a exit if this is the main opcode ...
-            self.output_asm.append(create_sys_exit(node.value))
+            if isinstance(node.value, MathOp):
+                # Unwrap it ... push add push add ..
+                # We will store the results into memory ...
+                self.convert_nodes(node.value)
+                self.output_asm.append(create_sys_exit("eax"))
+            else:
+                self.output_asm.append(create_sys_exit(node.value))
+        elif isinstance(node, MathOp):
+            """
+            The add opcode from assembly is like this
+            ADD immediate value to a register
+            """
+            # We write to EAX
+            self.output_asm.append(f"\t\taddl ${node.expr_1}, %eax")
+            if isinstance(node.expr_2, NumericValue):
+                self.output_asm.append(f"\t\taddl ${node.expr_2}, %eax")
+            else:
+                self.convert_nodes(node.expr_2)            
         else:
            
             raise Exception("Unknown node " + str(node))    

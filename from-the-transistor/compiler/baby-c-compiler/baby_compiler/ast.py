@@ -23,7 +23,8 @@ class Tokenizer:
             "}",
             ";",
             "/",
-            "*"
+            "*",
+            "+",
         ]
         self.tokens = self._get_tokens(source_code)
 
@@ -137,6 +138,12 @@ class TokenConsumer:
         token = self.tokens[self.index]
         self.index += 1
         return token
+
+    def is_peek_token(self, value):
+        if self.get_token() == value:
+            return True
+        self.index -= 1
+        return False
     
 class File(Nodes):
     def __init__(self, name) -> None:
@@ -150,6 +157,29 @@ class VariableDeclaration(Nodes):
         self.type = type
         self.name = name
         self.value = value
+        self.child_nodes = [value]
+
+class MathOp(Nodes):
+    def __init__(self, op, expr_1, expr_2) -> None:
+        super().__init__()
+        self.op = op
+        self.expr_1 = expr_1
+        self.expr_2 = expr_2
+        self.child_nodes = [
+            expr_1,
+            expr_2
+        ]
+
+class NumericValue(Nodes):
+    def __init__(self, value) -> None:
+        super().__init__()
+        self.value = value
+
+    def __str__(self) -> str:
+        return self.value
+
+    def __repr__(self) -> str:
+        return super().__repr__()
 
 class AST:
     def __init__(self, tokens) -> None:
@@ -177,6 +207,7 @@ class AST:
         function_scope = self.get_function_definition()
         # If nothing is found
         if function_scope is None:
+            print("Failed at ", self.tokens_index.tokens[self.tokens_index.index:self.tokens_index.index+5])
             self.tokens_index.index = checkpoint
 
         if self.tokens_index == checkpoint:
@@ -239,26 +270,48 @@ class AST:
             name = self.tokens_index.get_token()
             if name.isalnum():
                 if self.tokens_index.get_token() == "=":
-                    init_value = self.tokens_index.get_token()
-                    if self.tokens_index.get_token() == ";" and init_value.isnumeric():
-                        if init_value:
-                            # variable initiation
-                            return VariableDeclaration(
-                                TypeDefinition(type_value),
-                                name,
-                                init_value
-                            )
+                    math_expression = self.get_math_expression()
+                    if self.tokens_index.get_token() == ";" and math_expression is not None:
+                        # variable initiation
+                        return VariableDeclaration(
+                            TypeDefinition(type_value),
+                            name,
+                            math_expression
+                        )
         return None
 
     def get_return_definition(self):
         if self.tokens_index.get_token() == "return":
             value = self.tokens_index.get_token()
             if value.isnumeric():
+                # Move back from the ;
+                self.tokens_index.index -= 1
+                math_expression = self.get_math_expression()
+                if math_expression is None:
+                    return None
                 if self.tokens_index.get_token() == ";":
-                    return ReturnDefinition(value)
+                    return ReturnDefinition(math_expression)
             elif value.isalnum():
                 # TODO: Should check if this is a variable assignment
                 if self.tokens_index.get_token() == ";":
                     return ReturnDefinition(value)
         return None
     
+    def get_expression(self):
+        pass
+
+    def get_math_expression(self):
+        # How do we best evaluate this ? 
+        value_1 = self.tokens_index.get_token()
+        if self.tokens_index.is_peek_token("+"):
+            expr_2 = self.get_math_expression()
+            if expr_2 is None:
+                return None
+            return MathOp(
+                "+",
+                NumericValue(value_1),
+                expr_2
+            )
+        elif value_1.isnumeric():
+            return NumericValue(value_1)
+

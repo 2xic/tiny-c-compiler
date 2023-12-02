@@ -38,7 +38,7 @@ class Snapshot:
                 if not reference == json.dumps(self.output):
                     print_red(f"\tFailed {self.test_name}")
                     print_green("New " + str(self.output))
-                    print_red("Old " + str(reference))
+                    print_red("Old " + str(json.loads(reference)))
                     exit(0)
         else:
             with open(path, "w") as file:

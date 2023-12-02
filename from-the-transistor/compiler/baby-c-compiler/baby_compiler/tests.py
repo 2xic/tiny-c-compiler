@@ -41,7 +41,7 @@ if __name__ == "__main__":
         """
             // Test 
             int main(){
-                int a = 2;
+                int a = 2 + 2 + 2 + 2; // This should not be evaluated in memory ...
                 return a; // This should be a variable declaration :)
             }
         """
