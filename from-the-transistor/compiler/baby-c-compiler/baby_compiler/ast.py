@@ -21,7 +21,9 @@ class Tokenizer:
             ")",
             "{",
             "}",
-            ";"
+            ";",
+            "/",
+            "*"
         ]
         self.tokens = self._get_tokens(source_code)
 
@@ -30,9 +32,34 @@ class Tokenizer:
         tokens = []
 
         token = ""
+        is_waiting_for_new_line = False
         while index < len(source_code):
             char = source_code[index]
-            if char in self.special_symbols:
+            if is_waiting_for_new_line and char != "\n":
+                index += 1
+                continue
+            elif is_waiting_for_new_line:
+                is_waiting_for_new_line = False
+            # Find symbols
+            if char == "/" and source_code[index + 1] == "/":
+                # read until \n
+                if len(token):
+                    tokens.append(token)
+                    token = ""
+                is_waiting_for_new_line = True
+                index += 1
+                print("www")
+            elif char == "/" and source_code[index + 1] == "*":
+                # read until \n
+                if len(token):
+                    tokens.append(token)
+                    token = ""
+                while index < len(source_code):
+                    if source_code[index] == "*" and source_code[index + 1] == "/":
+                        index += 1
+                        break
+                    index += 1
+            elif char in self.special_symbols:
                 if len(token):
                     tokens.append(token)
                 tokens.append(char)
@@ -46,6 +73,7 @@ class Tokenizer:
             index += 1
         if len(token):
             tokens.append(token)
+        print("??")
         return tokens
     
 
@@ -60,7 +88,10 @@ class Nodes:
     def __str__(self) -> str:
         # lol
         name = getattr(self, "name") if "name" in dir(self) else ""
-        return f"{self.__class__.__name__} ({name}) " + str(self.child_nodes)
+        if len(name):
+            return f"{self.__class__.__name__} ({name}) " + str(self.child_nodes)
+        else:
+            return f"{self.__class__.__name__} " + str(self.child_nodes)
 
     def __repr__(self) -> str:
         return self.__str__()
@@ -89,6 +120,10 @@ class FunctionDefinition(Nodes):
             self.return_parameters
         ]
 
+class FunctionBody(Nodes):
+    def __init__(self) -> None:
+        super().__init__()
+
 class Parameters(Nodes):
     def __init__(self) -> None:
         super().__init__()
@@ -109,6 +144,13 @@ class File(Nodes):
         self.name = name
         self.functions = {}
 
+class VariableDeclaration(Nodes):
+    def __init__(self, type, name, value) -> None:
+        super().__init__()
+        self.type = type
+        self.name = name
+        self.value = value
+
 class AST:
     def __init__(self, tokens) -> None:
         self.tokens = tokens
@@ -126,7 +168,7 @@ class AST:
         if isinstance(file_nodes, FunctionDefinition):
             file.functions[file_nodes.name] = file_nodes
 
-        assert self.tokens_index.index == len(self.tokens), self.tokens_index.index
+        assert self.tokens_index.index == len(self.tokens),  "Failed to parse source code..."
         return file
 
     def get_root_symbols(self):
@@ -148,7 +190,12 @@ class AST:
             name = self.tokens_index.get_token()
             if name.isalnum():
                 parameters = self.get_function_arguments()
+                if parameters is None:
+                    return None
                 body = self.parse_function_body()
+                if body is None:
+                    return None
+                
                 return FunctionDefinition(
                     name,
                     parameters,
@@ -165,11 +212,53 @@ class AST:
     
     def parse_function_body(self):
         if self.tokens_index.get_token() == "{":
-            if self.tokens_index.get_token() == "return":
-                value = self.tokens_index.get_token()
-                if value.isnumeric():
-                    if self.tokens_index.get_token() == ";":
-                        if self.tokens_index.get_token() == "}":
-                            return ReturnDefinition(value)
+            found_token = True
+            body = FunctionBody()
+            while found_token:
+                for create_node in [
+                    self.get_return_definition,
+                    self.get_variable_assignment
+                ]:                    
+                    local_check_point = self.tokens_index.index
+                    node_definition = create_node()
+                    if node_definition is None:
+                        found_token = False
+                        self.tokens_index.index = local_check_point
+                    else:
+                        body.child_nodes.append(node_definition)
+                        found_token = True
+                        break
+            # if it all failed
+            if self.tokens_index.get_token() == "}":
+                return body                
+        return None
+    
+    def get_variable_assignment(self):
+        type_value = self.tokens_index.get_token()
+        if type_value in self.types:
+            name = self.tokens_index.get_token()
+            if name.isalnum():
+                if self.tokens_index.get_token() == "=":
+                    init_value = self.tokens_index.get_token()
+                    if self.tokens_index.get_token() == ";" and init_value.isnumeric():
+                        if init_value:
+                            # variable initiation
+                            return VariableDeclaration(
+                                TypeDefinition(type_value),
+                                name,
+                                init_value
+                            )
         return None
 
+    def get_return_definition(self):
+        if self.tokens_index.get_token() == "return":
+            value = self.tokens_index.get_token()
+            if value.isnumeric():
+                if self.tokens_index.get_token() == ";":
+                    return ReturnDefinition(value)
+            elif value.isalnum():
+                # TODO: Should check if this is a variable assignment
+                if self.tokens_index.get_token() == ";":
+                    return ReturnDefinition(value)
+        return None
+    

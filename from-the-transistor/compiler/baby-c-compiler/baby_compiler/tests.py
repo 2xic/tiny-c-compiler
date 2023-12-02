@@ -1,25 +1,48 @@
 """
 Messy tests, lalalala
 """
-
+import hashlib
 from .ast import Tokenizer, AST
 from .snapshots import Snapshot
 from .ast_2_asm import Ast2Asm
 
-tokenizer = Tokenizer(
-    """
-        int main(){
-            return 2;
-        }
-    """
-)
-print(tokenizer.tokens)
-assert Snapshot("correct_tokenized", tokenizer.tokens).check()
+def source_code_test(source_code):
+    id_hash = hashlib.sha256(source_code.encode()).hexdigest()[:8]
+    tokenizer = Tokenizer(source_code)
+    print(tokenizer.tokens)
+    assert Snapshot(f"{id_hash}_correct_tokenized", tokenizer.tokens).check()
 
-tree = AST(tokenizer.tokens)
-file_ast = tree.build_ast()
-assert Snapshot("ast", str(file_ast)).check()
+    tree = AST(tokenizer.tokens)
+    file_ast = tree.build_ast()
+    assert Snapshot(f"{id_hash}_ast", str(file_ast)).check()
 
-asm = Ast2Asm(file_ast)
-assert Snapshot("asm", str(asm.get_asm())).check()
+    asm = Ast2Asm(file_ast)
+    assert Snapshot(f"{id_hash}_asm", str(asm.get_asm())).check()
 
+if __name__ == "__main__":
+    source_code_test(
+        """
+            /* Test */
+            int main(){
+                return 2;
+            }
+        """
+    )
+    source_code_test(
+        """
+            // Test 
+            int main(){
+                int a = 2;
+                return 2;
+            }
+        """
+    )
+    source_code_test(
+        """
+            // Test 
+            int main(){
+                int a = 2;
+                return a; // This should be a variable declaration :)
+            }
+        """
+    )

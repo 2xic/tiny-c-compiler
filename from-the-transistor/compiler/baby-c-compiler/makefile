@@ -13,4 +13,5 @@ baby_compiler_test:
 run_baby_compiler:
 	python3 -m baby_compiler.compiler ./reference/simple.c ./reference/baby_c.s
 	gcc -c reference/baby_c.s -o file.o
+	ld file.o -o yourprogram.o
 
