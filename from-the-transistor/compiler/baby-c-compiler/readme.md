@@ -1,3 +1,14 @@
+# Status
+Currently we only support very basic stuff. No printf, no fancy stuff.
+
+You can basically not do anything more fancy than what is shown below (yet)
+```c
+int main(){
+    int a;
+    a = 9 + 2;
+    return a; 
+}
+```
 
 ## Resources
 - https://www.wilfred.me.uk/blog/2014/08/27/baby-steps-to-a-c-compiler/
@@ -18,3 +29,4 @@ Mostly to just get an idea of features that people commonly implement for this (
 
 - https://github.com/Wilfred/babyc#current-feature-set
 - 
+

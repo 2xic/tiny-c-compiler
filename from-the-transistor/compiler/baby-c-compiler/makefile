@@ -2,6 +2,9 @@
 simple:
 	gcc -c -g -Wa,-a,-ad reference/simple.c
 
+multiple_functions:
+	gcc -c -g -Wa,-a,-ad reference/multiple_functions.c
+
 build_asm_simple:
 	gcc -c reference/simple.s -o file.o
 	ld file.o -o yourprogram.o
@@ -16,3 +19,10 @@ run_baby_compiler:
 	ld file.o -o yourprogram.o
 	./yourprogram.o || (echo "Returned with == $$?"; exit 0)
 
+run_baby_compiler_tests:
+	./assert.sh ./reference/simple.c "11"
+	./assert.sh ./reference/multiple_functions.c "5"
+	./assert.sh ./reference/multiple_sum.c "14"
+	./assert.sh ./reference/multiple_functions_with_more_math.c "10"
+	./assert.sh ./reference/multiple_functions_with_more_math.c "10"
+	./assert.sh ./reference/multiple_chained_functions_calls.c "28"

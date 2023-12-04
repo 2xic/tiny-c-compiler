@@ -125,6 +125,12 @@ class FunctionDefinition(Nodes):
             self.return_parameters
         ]
 
+class FunctionCall(Nodes):
+    def __init__(self, function_name, parameters) -> None:
+        super().__init__()
+        self.function_name = function_name
+        self.parameters = parameters
+
 class FunctionBody(Nodes):
     def __init__(self) -> None:
         super().__init__()
@@ -149,6 +155,9 @@ class TokenConsumer:
         self.index -= 1
         return False
     
+    def peek_token(self):
+        return self.tokens[self.index]
+
 class File(Nodes):
     def __init__(self, name) -> None:
         super().__init__()
@@ -208,12 +217,14 @@ class AST:
     def build_ast(self):
         # Statements currently supported are only tokens
         file = File("example.c")
-        file_nodes = self.get_root_symbols()
-        file.child_nodes.append(file_nodes)
 
-        if isinstance(file_nodes, FunctionDefinition):
-            file.functions[file_nodes.name] = file_nodes
-
+        prev_token = -1
+        while prev_token !=  self.tokens_index.index and self.tokens_index.index < len(self.tokens):
+            prev_token =  self.tokens_index.index
+            file_nodes = self.get_root_symbols()
+            file.child_nodes.append(file_nodes)
+            if isinstance(file_nodes, FunctionDefinition):
+                file.functions[file_nodes.name] = file_nodes
         assert self.tokens_index.index == len(self.tokens),  "Failed to parse source code..."
         return file
 
@@ -252,6 +263,8 @@ class AST:
         return None
 
     def get_function_arguments(self):
+        # This is used ny both the call function and definition function
+        # TODO ^ change that 
         if self.tokens_index.get_token() == "(":
             if self.tokens_index.get_token() == ")":
                 return Parameters()
@@ -320,6 +333,7 @@ class AST:
                 # Move back from the ;
                 self.tokens_index.index -= 1
                 math_expression = self.get_math_expression()
+                print(math_expression)
                 if math_expression is None:
                     return None
                 if self.tokens_index.get_token() == ";":
@@ -332,16 +346,27 @@ class AST:
     
     def get_math_expression(self):
         # How do we best evaluate this ? 
-        value_1 = self.tokens_index.get_token()
+        value_1 = self.get_expression() #self.tokens_index.get_token()
         if self.tokens_index.is_peek_token("+"):
             expr_2 = self.get_math_expression()
             if expr_2 is None:
                 return None
             return MathOp(
                 "+",
-                NumericValue(value_1),
+                value_1,
                 expr_2
             )
-        elif value_1.isnumeric():
-            return NumericValue(value_1)
+        elif value_1:
+            return value_1
+        return None
 
+    def get_expression(self):
+        token = self.tokens_index.get_token()
+        if token.isnumeric():
+            return NumericValue(token)
+        elif token.isalnum() and self.tokens_index.peek_token() == "(":
+            function_arguments = self.get_function_arguments()
+            return FunctionCall(
+                token,
+                function_arguments,
+            )

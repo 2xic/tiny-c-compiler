@@ -55,3 +55,32 @@ if __name__ == "__main__":
             }
         """
     )
+    source_code_test(
+        """
+            int anotherFunction (){
+                return 5;
+            }
+
+            int main(){
+                int a = anotherFunction();
+                return a;
+            }
+        """
+    )
+    source_code_test(
+        """
+            int thisIsOneMoreFunctions (){
+                return 5;
+            }
+
+            int anotherFunction (){
+                return 5 + thisIsOneMoreFunctions();
+            }
+
+            int main(){
+                int a;
+                a = anotherFunction();
+                return a;
+            }
+        """
+    )
