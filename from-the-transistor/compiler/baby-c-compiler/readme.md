@@ -3,10 +3,18 @@ Currently we only support very basic stuff. No printf, no fancy stuff.
 
 You can basically not do anything more fancy than what is shown below (yet)
 ```c
+int topLevelCall (){
+    return 9;
+}
+
+int anotherFunction (){
+    return 5 + topLevelCall () + 5 + topLevelCall ();
+}
+
 int main(){
     int a;
-    a = 9 + 2;
-    return a; 
+    a = anotherFunction();
+    return a;
 }
 ```
 
@@ -28,5 +36,4 @@ int main(){
 Mostly to just get an idea of features that people commonly implement for this (most people don't fully implement c)
 
 - https://github.com/Wilfred/babyc#current-feature-set
-- 
 

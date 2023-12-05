@@ -187,7 +187,7 @@ class VariableAssignment(Nodes):
     def __init__(self, v_reference, v_value) -> None:
         super().__init__()
         self.v_reference = v_reference
-        self.v_value = v_value
+        self.value = v_value
         self.child_nodes = [
             v_reference,
             v_value
@@ -346,7 +346,7 @@ class AST:
     
     def get_math_expression(self):
         # How do we best evaluate this ? 
-        value_1 = self.get_expression() #self.tokens_index.get_token()
+        value_1 = self.get_expression()
         if self.tokens_index.is_peek_token("+"):
             expr_2 = self.get_math_expression()
             if expr_2 is None:

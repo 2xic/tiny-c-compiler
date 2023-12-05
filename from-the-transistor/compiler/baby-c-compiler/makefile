@@ -26,3 +26,8 @@ run_baby_compiler_tests:
 	./assert.sh ./reference/multiple_functions_with_more_math.c "10"
 	./assert.sh ./reference/multiple_functions_with_more_math.c "10"
 	./assert.sh ./reference/multiple_chained_functions_calls.c "28"
+	./assert.sh ./reference/function_assigment.c "9"
+	./assert.sh ./reference/function_calls_over_all.c "32"
+
+tests: run_baby_compiler_tests 
+	echo "Good compiler :)"

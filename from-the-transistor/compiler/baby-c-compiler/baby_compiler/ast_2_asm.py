@@ -89,30 +89,14 @@ class Ast2Asm:
         elif isinstance(node, VariableDeclaration):
             # TODO: Doing this just because it is easier to deal with
             # Likely we should do some stack allocations etc depending on context 
-            if isinstance(node.value, MathOp):
-                self.data_sections.append(
-                    f"\t{node.name}: .word 0"
-                )
-                # THen we store this into the .data value ? 
-                output.append(
-                    f"\txor %eax, %eax"
-                )
+            self.data_sections.append(
+                f"\t{node.name}: .word 0"
+            )
+            if not node.value is None:
+                # Else the node has to write the data to %eax at some point during the evaluation
                 self.convert_nodes(node.value, output) 
                 output.append(
                     f"\tmovl %eax, {node.name}"
-                )
-            elif node.value is None:
-                self.data_sections.append(
-                    f"\t{node.name}: .word 0"
-                )
-            elif isinstance(node.value, FunctionCall):
-                output.append(
-                    f"\tcall {node.value.function_name}"
-                )
-                print("swap?")
-            else:
-                self.data_sections.append(
-                    f"\t{node.name}: .word {node.value}"
                 )
         elif isinstance(node, FunctionBody):
             for i in node.child_nodes:
@@ -144,56 +128,49 @@ class Ast2Asm:
             The add opcode from assembly is like this
             ADD immediate value to a register
             """
-            # We write to EAX, but should be able to do more dynamic allocations soonish
-            if isinstance(node.expr_1, FunctionCall):
-                output.append("\tmovl %eax, %ebx") # copy over the value
-                self.convert_nodes(node.expr_1, output)
-                output.append(
-                    f"\taddl %ebx, %eax"
-                )
-            elif isinstance(node.expr_1, NumericValue):
-                output.append(f"\taddl ${node.expr_1}, %eax")
-            else:
-                raise Exception("Unknown mathop tree")
-            # expr -2
-            if isinstance(node.expr_2, NumericValue):
-                output.append(f"\taddl ${node.expr_2}, %eax")
-            elif isinstance(node.expr_2, MathOp):
-                self.convert_nodes(node.expr_2, output)                
-            elif isinstance(node.expr_2, FunctionCall):
-                output.append("\tmovl %eax, %ebx") # copy over the value
-                self.convert_nodes(node.expr_2, output)
-                output.append(
-                    f"\taddl %ebx, %eax"
-                )
-                # Now we can restore it 
-                # We now need to deal with the restoring of the value 
-            else:
-                raise Exception(f"Unknown math op node ({node})")
+            # We write to EAX, but should be able to do more dynamic allocations soon
+            self.handle_math_opcodes(node.expr_1, output)
+            self.handle_math_opcodes(node.expr_2, output)
 
         elif isinstance(node, VariableAssignment):
-            if isinstance(node.v_value, NumericValue):
+            # This should also zero out eax ....
+            # ^ technically I think we should zero eax at a different point, but okay
+            output.append(
+                f"\tmovl $0, {node.v_reference}"
+            )
+            output.append(
+                f"\tmovl $0, %eax"
+            )
+            # do the math
+            if isinstance(node.value, NumericValue):
                 output.append(
-                    f"\tmovl ${node.v_value.value}, {node.v_reference}"
+                    f"\tmovl ${node.value.value}, {node.v_reference}"
                 )
-            elif isinstance(node.v_value, MathOp):
-                self.convert_nodes(node.v_value, output)
-                output.append(
-                    f"\tmovl %eax, {node.v_reference}"
-                )
-            elif isinstance(node.v_value, FunctionCall):
-               output.append(
-                    f"\tcall {node.v_value.function_name}"
-                )
-                # do the call ... we store the results in registers ? or stack ?                 
-               output.append(
-                    f"\tmovl %eax, {node.v_reference}"
-               )
             else:
-                raise Exception("I did not implement math expressions here yet")
+                self.convert_nodes(node.value, output)
+                output.append(
+                    f"\tmovl %eax, {node.v_reference}"
+                )
         elif isinstance(node, FunctionCall):
                output.append(
                     f"\tcall {node.function_name}"
                 )
         else:
             raise Exception("Unknown node " + str(node))    
+    
+    def handle_math_opcodes(self, node, output):
+        if isinstance(node, NumericValue):
+            output.append(f"\taddl ${node}, %eax")
+        elif isinstance(node, MathOp):
+            self.convert_nodes(node, output)                
+        elif isinstance(node, FunctionCall):
+            self.backup_eax_then_add_restore(node, output)
+        else:
+            raise Exception(f"Unknown math op node ({node})")
+        
+    def backup_eax_then_add_restore(self, node, output):
+        output.append("\tmovl %eax, %ebx") # copy over the value
+        self.convert_nodes(node, output)
+        output.append(
+            f"\taddl %ebx, %eax"
+        )
