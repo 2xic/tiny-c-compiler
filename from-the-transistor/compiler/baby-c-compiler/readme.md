@@ -3,17 +3,13 @@ Currently we only support very basic stuff. No printf, no fancy stuff.
 
 You can basically not do anything more fancy than what is shown below (yet)
 ```c
-int topLevelCall (){
-    return 9;
-}
-
-int anotherFunction (){
-    return 5 + topLevelCall () + 5 + topLevelCall ();
+int anotherFunction (int a, int b){
+    return a + b;
 }
 
 int main(){
-    int a;
-    a = anotherFunction();
+    int a = anotherFunction(5, 9);
+    
     return a;
 }
 ```
@@ -26,6 +22,8 @@ int main(){
 
 ## Asm
 - https://www.cs.mcgill.ca/~cs573/fall2004/classnotes/Assem_Linux.pdf
+- Using the stack
+  - https://en.wikibooks.org/wiki/X86_Disassembly/The_Stack   
 
 ## Registers
 - https://en.wikibooks.org/wiki/X86_Assembly/X86_Architecture

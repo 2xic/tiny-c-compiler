@@ -1,7 +1,7 @@
 """
 We got nice AST output, we need nice output :)
 """
-from .ast import File, FunctionDefinition, ReturnDefinition, FunctionBody, VariableDeclaration, NumericValue, MathOp, VariableAssignment, FunctionCall
+from .ast import File, FunctionDefinition, ReturnDefinition, FunctionBody, VariableDeclaration, NumericValue, MathOp, VariableAssignment, FunctionCall, VariableReference
 
 
 class AsmOutputStream:
@@ -30,6 +30,12 @@ def create_sys_exit(exit_code):
     movl    $1, %eax
     int     $0x80
         """
+    elif isinstance(exit_code, VariableReference):
+        return f"""
+    movl    {exit_code.variable}, %ebx
+    movl    $1, %eax
+    int     $0x80
+        """
     else:
         # Hm - not ideal way to implement this but works
         return f"""
@@ -51,6 +57,9 @@ class Ast2Asm:
 .data
 """
         ]
+
+        # TODO: Make this part of the node instead
+        self.current_function = None
 
     def get_asm(self):
         """
@@ -81,11 +90,24 @@ class Ast2Asm:
         return "\n".join(list(filter(lambda x: len(x.strip()) > 0, "\n".join(combined).split("\n")))) + "\n"
 
     def convert_nodes(self, node, output: AsmOutputStream):
-        print(node)
         if isinstance(node, File):
             return self.convert_nodes(node, output)
         elif isinstance(node, FunctionDefinition):
-            return self.convert_nodes(node.body, output)
+            if not output.is_main:
+                pass
+             #   output.append("\tpushq   %rbp")
+                #for argument in node.parameters.child_nodes:
+                # we need to pop this off the stack at once ?
+                # Well I can do a pop, but I don't want that 
+                # I want to keep the values on the tack until we do the ret ..
+                 #   pass
+                 #   output.append("\tpushq $4")
+                #if len(node.parameters.child_nodes):
+                #    output.append("\tmovl 8(%rsp), %eax")
+            self.current_function = node
+            self.convert_nodes(node.body, output)
+
+
         elif isinstance(node, VariableDeclaration):
             # TODO: Doing this just because it is easier to deal with
             # Likely we should do some stack allocations etc depending on context 
@@ -112,7 +134,6 @@ class Ast2Asm:
                 else:
                     output.append(create_sys_exit(node.value))
             else:
-                output.append("\tpushq   %rbp")
                 if isinstance(node.value, NumericValue):
                     # We return a static value ? 
                     # okay 
@@ -120,7 +141,6 @@ class Ast2Asm:
                 elif isinstance(node.value, MathOp):
                     self.convert_nodes(node.value, output)
                 
-                output.append("\tpopq    %rbp")
                 output.append("\tret")
 
         elif isinstance(node, MathOp):
@@ -152,10 +172,16 @@ class Ast2Asm:
                     f"\tmovl %eax, {node.v_reference}"
                 )
         elif isinstance(node, FunctionCall):
+               for i in node.parameters.child_nodes:
+                    if isinstance(i, NumericValue):
+                       output.append(f"\tpush ${i.value}")
+                    else:
+                        raise Exception("Unknown parameter")
                output.append(
                     f"\tcall {node.function_name}"
                 )
         else:
+            print(node)
             raise Exception("Unknown node " + str(node))    
     
     def handle_math_opcodes(self, node, output):
@@ -165,6 +191,15 @@ class Ast2Asm:
             self.convert_nodes(node, output)                
         elif isinstance(node, FunctionCall):
             self.backup_eax_then_add_restore(node, output)
+        elif node is None:
+            pass
+        elif isinstance(node, VariableReference):
+            # This way of looking up the arguments should be made illegal, plz fix it.
+            for index, i in enumerate(self.current_function.parameters.child_nodes):
+                if i.name == node.variable:
+                    output.append(f"\taddl {8 * (index + 1)}(%rsp), %eax")
+                    break
+            #raise Exception(f"Unknown math op node ({node})")
         else:
             raise Exception(f"Unknown math op node ({node})")
         

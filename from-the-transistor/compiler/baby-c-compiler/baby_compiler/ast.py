@@ -28,7 +28,8 @@ class Tokenizer:
             "-",
             "~",
             "&",
-            "|"
+            "|",
+            ","
         ]
         self.tokens = self._get_tokens(source_code)
 
@@ -112,8 +113,14 @@ class TypeDefinition(Nodes):
         super().__init__()
         self.name = name
 
+class Parameters(Nodes):
+    def __init__(self, parameters) -> None:
+        super().__init__()
+
+        self.child_nodes = parameters
+
 class FunctionDefinition(Nodes):
-    def __init__(self, name, parameters, body, return_parameters) -> None:
+    def __init__(self, name, parameters: Parameters, body, return_parameters) -> None:
         super().__init__()
         self.name = name
         self.parameters = parameters
@@ -126,7 +133,7 @@ class FunctionDefinition(Nodes):
         ]
 
 class FunctionCall(Nodes):
-    def __init__(self, function_name, parameters) -> None:
+    def __init__(self, function_name, parameters: Parameters) -> None:
         super().__init__()
         self.function_name = function_name
         self.parameters = parameters
@@ -135,9 +142,6 @@ class FunctionBody(Nodes):
     def __init__(self) -> None:
         super().__init__()
 
-class Parameters(Nodes):
-    def __init__(self) -> None:
-        super().__init__()
 
 class TokenConsumer:
     def __init__(self, tokens) -> None:
@@ -192,6 +196,13 @@ class VariableAssignment(Nodes):
             v_reference,
             v_value
         ]
+
+class VariableReference(Nodes):
+    def __init__(self, variable) -> None:
+        super().__init__()
+
+        self.variable = variable
+
 
 class NumericValue(Nodes):
     def __init__(self, value) -> None:
@@ -266,8 +277,41 @@ class AST:
         # This is used ny both the call function and definition function
         # TODO ^ change that 
         if self.tokens_index.get_token() == "(":
-            if self.tokens_index.get_token() == ")":
-                return Parameters()
+            parameters = []
+            while not self.tokens_index.peek_token() == ")":
+                if self.tokens_index.peek_token() == "int":
+                    parameters.append(
+                        VariableDeclaration(
+                            type=self.tokens_index.get_token(),
+                            name=self.tokens_index.get_token(),
+                            value=None,
+                        )
+                    )
+                    self.variables[parameters[-1].name] = True
+                elif self.tokens_index.peek_token() == ",":
+                    self.tokens_index.get_token()
+                else:
+                    raise Exception(f"Unknown input {self.tokens_index.peek_token()}")
+            assert self.tokens_index.get_token() == ")"
+            return Parameters(parameters)
+        return None
+
+    def get_function_call_arguments(self):
+        # This is used ny both the call function and definition function
+        # TODO ^ change that 
+        if self.tokens_index.get_token() == "(":
+            parameters = []
+            while not self.tokens_index.peek_token() == ")":
+                if self.tokens_index.peek_token().isnumeric():
+                    parameters.append(NumericValue(
+                        self.tokens_index.get_token()
+                    ))
+                elif self.tokens_index.peek_token() == ",":
+                    self.tokens_index.get_token()
+                else:
+                    raise Exception(f"Unknown input {self.tokens_index.peek_token()}")
+            assert self.tokens_index.get_token() == ")"
+            return Parameters(parameters)
         return None
     
     def parse_function_body(self):
@@ -328,20 +372,12 @@ class AST:
     
     def get_return_definition(self):
         if self.tokens_index.get_token() == "return":
-            value = self.tokens_index.get_token()
-            if value.isnumeric():
-                # Move back from the ;
-                self.tokens_index.index -= 1
-                math_expression = self.get_math_expression()
-                print(math_expression)
-                if math_expression is None:
-                    return None
-                if self.tokens_index.get_token() == ";":
-                    return ReturnDefinition(math_expression)
-            elif value.isalnum():
-                # TODO: Should check if this is a variable assignment
-                if self.tokens_index.get_token() == ";":
-                    return ReturnDefinition(value)
+            print(self.tokens_index.tokens[self.tokens_index.index:self.tokens_index.index+5])
+            math_expression = self.get_math_expression()
+            if math_expression is None:
+                return None
+            if self.tokens_index.get_token() == ";":
+                return ReturnDefinition(math_expression)
         return None
     
     def get_math_expression(self):
@@ -365,8 +401,13 @@ class AST:
         if token.isnumeric():
             return NumericValue(token)
         elif token.isalnum() and self.tokens_index.peek_token() == "(":
-            function_arguments = self.get_function_arguments()
+            function_arguments = self.get_function_call_arguments()
             return FunctionCall(
                 token,
                 function_arguments,
             )
+        elif token in self.variables:
+            return VariableReference(token)
+        else:
+            raise Exception("Unknown expression node {token}")
+        
