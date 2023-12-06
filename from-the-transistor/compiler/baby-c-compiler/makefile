@@ -31,6 +31,8 @@ run_baby_compiler_tests:
 	./assert.sh ./reference/function_calls_with_arguments.c "7"
 	./assert.sh ./reference/function_calls_with_arguments_inline.c "14"
 	./assert.sh ./reference/function_write_syscall.c "0" "example"
+	./assert.sh ./reference/function_if_statments_with_if_branch.c "0" "yes"
+	./assert.sh ./reference/function_if_statments_with_else_branch.c "3" "No"
 
 tests: run_baby_compiler_tests 
 	echo "Good compiler :)"

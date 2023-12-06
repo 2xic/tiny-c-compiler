@@ -163,6 +163,10 @@ class TokenConsumer:
     def peek_token(self, peek=0):
         if self.index + peek < len(self.tokens):
             return self.tokens[self.index + peek]
+        
+    def context(self):
+        return self.tokens[self.index:self.index+5]
+
 
 class File(Nodes):
     def __init__(self, name) -> None:
@@ -227,6 +231,31 @@ class StringValue(Nodes):
 
     def __repr__(self) -> str:
         return super().__repr__()
+    
+class Conditionals:
+    def __init__(self, if_condition, else_condition) -> None:
+        self. if_condition =  if_condition
+        self.else_condition = else_condition
+
+
+class IfCondition:
+    def __init__(self, condition, body) -> None:
+        self.condition = condition
+        self.body = body
+
+class ElseCondition:
+    def __init__(self, body) -> None:
+        self.body = body
+
+class ConditionCheck:
+    def __init__(self, value) -> None:
+        self.value = value
+
+class Equal:
+    def __init__(self, a, b) -> None:
+        self.a = a 
+        self.b = b
+
 
 class AST:
     def __init__(self, tokens) -> None:
@@ -324,7 +353,7 @@ class AST:
                 elif self.tokens_index.peek_token() == '"':
                     _ = self.tokens_index.get_token()
                     value = self.tokens_index.get_token()
-                    assert '"' == self.tokens_index.get_token()
+                    assert '"' == self.tokens_index.get_token(), "Expected terminator"
                     parameters.append(StringValue(
                         value
                     ))
@@ -342,6 +371,7 @@ class AST:
                 for create_node in [
                     self.get_return_definition,
                     self.get_variable_declaration_or_assignment,
+                    self.parse_conditional_statements,
                     self.get_inline_function_call,
                 ]:                    
                     local_check_point = self.tokens_index.index
@@ -430,6 +460,7 @@ class AST:
         
     def get_inline_function_call(self):
         value = self.get_function_call()        
+        print((value))
         if value is not None and self.tokens_index.peek_token() == ";":
             assert self.tokens_index.get_token() == ";"
             return value
@@ -442,3 +473,49 @@ class AST:
                 token,
                 function_arguments,
             )
+
+    def parse_conditional_statements(self):
+        token = self.tokens_index.get_token()
+        # From here we can find and else or else if
+        if  self.tokens_index.peek_token(0) == "(" and token == "if":
+            assert self.tokens_index.get_token() == "("
+            return Conditionals(
+                if_condition=self.parse_if_statements(can_be_if=True),
+                # TODO: else if 
+                else_condition=self.parse_if_statements(can_be_if=False),
+            )
+
+    def parse_if_statements(self, can_be_if=False):
+        if can_be_if:
+            return self.parse_condition_body()
+        else:
+            token = self.tokens_index.get_token()
+            if  self.tokens_index.peek_token(0) == "{" and token == "else":
+                return ElseCondition(
+                    body=self.parse_function_body()
+                )
+
+    def parse_condition_body(self):
+        token = self.tokens_index.get_token()
+        if self.tokens_index.get_token() == "==":
+            if token in self.variables:
+                first_expression = VariableReference(token)
+                # Get the next token
+                second_expression = self.tokens_index.get_token()
+                if second_expression.isnumeric():
+                    second_expression = NumericValue(second_expression)
+                    assert self.tokens_index.get_token() == ")"
+                    results = IfCondition(
+                        condition=Equal(
+                            first_expression,
+                            second_expression
+                        ),
+                        body=self.parse_function_body()
+                    )
+                    print((results))
+                    return results
+                else:
+                    raise Exception("Failed ")
+            else:
+                raise Exception("Not supported yet ... ")
+

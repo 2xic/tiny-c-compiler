@@ -1,7 +1,7 @@
 """
 We got nice AST output, we need nice output :)
 """
-from .ast import File, FunctionDefinition, ReturnDefinition, FunctionBody, VariableDeclaration, NumericValue, MathOp, VariableAssignment, FunctionCall, VariableReference,Parameters, StringValue
+from .ast import File, FunctionDefinition, ReturnDefinition, FunctionBody, VariableDeclaration, NumericValue, MathOp, VariableAssignment, FunctionCall, VariableReference, StringValue, Conditionals, IfCondition, ElseCondition, Equal
 
 
 class AsmOutputStream:
@@ -64,6 +64,7 @@ class Ast2Asm:
         self.built_in_functions = {
             "write":SyswriteMapping()
         }
+        self.message_counter = 2
 
 
     def get_asm(self):
@@ -117,7 +118,7 @@ class Ast2Asm:
             # TODO: Doing this just because it is easier to deal with
             # Likely we should do some stack allocations etc depending on context 
             self.data_sections.append(
-                f"\t{node.name}: .word 0"
+                f"\t{node.name}: .long 0"
             )
             if not node.value is None:
                 # Else the node has to write the data to %eax at some point during the evaluation
@@ -128,6 +129,8 @@ class Ast2Asm:
         elif isinstance(node, FunctionBody):
             for i in node.child_nodes:
                 self.convert_nodes(i, output)
+                if isinstance(i, Conditionals):
+                    output.append("end_of_if:")
         elif isinstance(node, ReturnDefinition):
             if output.is_main:
                 # technically it should only be a exit if this is the main opcode ...
@@ -194,6 +197,33 @@ class Ast2Asm:
                     output.append(
                         f"\tcall {node.function_name}"
                     )
+        elif isinstance(node, Conditionals):
+            self.convert_nodes(node.if_condition, output)
+            # Then we need to jump 
+            # Then we can next condition, but not write to it yet.  
+           # b_else_condition = AsmOutputStream()
+            self.convert_nodes(node.else_condition, output)
+
+        elif isinstance(node, IfCondition):
+            self.convert_nodes(node.condition, output)
+            output.append("loc_a:")
+            self.convert_nodes(node.body, output)
+            output.append("\tjmp end_of_if")
+        elif isinstance(node, ElseCondition):
+            output.append("loc_b:")
+            # else:
+            self.convert_nodes(node.body, output)
+        elif isinstance(node, Equal):
+            # I want to simple resolve here, variable reference are hard to think about ... 
+            a: VariableReference = node.a 
+            b: NumericValue = node.b
+            output.append(
+                f"\tcmpl ${b.value}, {a.variable}"
+            )
+            # todo: hardcoded ... fix
+            output.append(
+                f"\tjne loc_b"
+            )
         else:
             print(node)
             raise Exception("Unknown node " + str(node))    
@@ -234,8 +264,17 @@ class SyswriteMapping:
         assert isinstance(parameters[1], NumericValue)
         assert isinstance(parameters[2], StringValue)
         string_value = parameters[2].value
+        message_id = f"message{asm_root.message_counter}"
+        output.append(
+            "\txor     %eax, %eax",
+        )
+        output.append(
+            "\txor     %ebx, %ebx",
+        )
+
+        asm_root.message_counter += 1
         asm_root.data_sections.append(
-            f"\tmessage:  .ascii  \"{string_value}\""
+            f"\t{message_id}:  .ascii  \"{string_value}\""
         )
         output.append(
             "\tmov     $1, %rax",
@@ -243,8 +282,11 @@ class SyswriteMapping:
         output.append(
             "\tmov     $1, %rdi",
         )
+#        output.append(
+#            f"\tlea     {message_id}(%si), %rsi",
+#        )
         output.append(
-            "\tlea     message(%rip), %rsi",
+            f"\tlea     {message_id}(%rip), %rsi",
         )
         output.append(
             f"\tmov     ${len(string_value)}, %rdx"
