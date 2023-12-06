@@ -29,7 +29,8 @@ class Tokenizer:
             "~",
             "&",
             "|",
-            ","
+            ",",
+            '"'
         ]
         self.tokens = self._get_tokens(source_code)
 
@@ -159,8 +160,9 @@ class TokenConsumer:
         self.index -= 1
         return False
     
-    def peek_token(self):
-        return self.tokens[self.index]
+    def peek_token(self, peek=0):
+        if self.index + peek < len(self.tokens):
+            return self.tokens[self.index + peek]
 
 class File(Nodes):
     def __init__(self, name) -> None:
@@ -205,6 +207,17 @@ class VariableReference(Nodes):
 
 
 class NumericValue(Nodes):
+    def __init__(self, value) -> None:
+        super().__init__()
+        self.value = value
+
+    def __str__(self) -> str:
+        return self.value
+
+    def __repr__(self) -> str:
+        return super().__repr__()
+
+class StringValue(Nodes):
     def __init__(self, value) -> None:
         super().__init__()
         self.value = value
@@ -291,7 +304,7 @@ class AST:
                 elif self.tokens_index.peek_token() == ",":
                     self.tokens_index.get_token()
                 else:
-                    raise Exception(f"Unknown input {self.tokens_index.peek_token()}")
+                    raise Exception(f"Unknown input '{self.tokens_index.peek_token()}'")
             assert self.tokens_index.get_token() == ")"
             return Parameters(parameters)
         return None
@@ -308,6 +321,13 @@ class AST:
                     ))
                 elif self.tokens_index.peek_token() == ",":
                     self.tokens_index.get_token()
+                elif self.tokens_index.peek_token() == '"':
+                    _ = self.tokens_index.get_token()
+                    value = self.tokens_index.get_token()
+                    assert '"' == self.tokens_index.get_token()
+                    parameters.append(StringValue(
+                        value
+                    ))
                 else:
                     raise Exception(f"Unknown input {self.tokens_index.peek_token()}")
             assert self.tokens_index.get_token() == ")"
@@ -322,6 +342,7 @@ class AST:
                 for create_node in [
                     self.get_return_definition,
                     self.get_variable_declaration_or_assignment,
+                    self.get_inline_function_call,
                 ]:                    
                     local_check_point = self.tokens_index.index
                     node_definition = create_node()
@@ -397,17 +418,27 @@ class AST:
         return None
 
     def get_expression(self):
-        token = self.tokens_index.get_token()
+        token = self.tokens_index.peek_token()
         if token.isnumeric():
-            return NumericValue(token)
-        elif token.isalnum() and self.tokens_index.peek_token() == "(":
+            return NumericValue(self.tokens_index.get_token())
+        elif token.isalnum() and self.tokens_index.peek_token(1) == "(":
+            return self.get_function_call()
+        elif token in self.variables:
+            return VariableReference(self.tokens_index.get_token())
+        else:
+            raise Exception("Unknown expression node {token}")
+        
+    def get_inline_function_call(self):
+        value = self.get_function_call()        
+        if value is not None and self.tokens_index.peek_token() == ";":
+            assert self.tokens_index.get_token() == ";"
+            return value
+    
+    def get_function_call(self):
+        token = self.tokens_index.get_token()
+        if  self.tokens_index.peek_token(0) == "(":
             function_arguments = self.get_function_call_arguments()
             return FunctionCall(
                 token,
                 function_arguments,
             )
-        elif token in self.variables:
-            return VariableReference(token)
-        else:
-            raise Exception("Unknown expression node {token}")
-        

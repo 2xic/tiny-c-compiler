@@ -19,6 +19,17 @@ def source_code_test(source_code):
     asm = Ast2Asm(file_ast)
     assert Snapshot(f"{id_hash}_asm", str(asm.get_asm())).check()
 
+
+def test_error_detection():
+    """
+    Example cases where the ast should get mad
+    - Functions that are not defined
+    - Variables that are not defined
+    
+    """
+    pass
+
+
 if __name__ == "__main__":
     source_code_test(
         """

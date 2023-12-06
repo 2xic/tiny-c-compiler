@@ -30,6 +30,7 @@ run_baby_compiler_tests:
 	./assert.sh ./reference/function_calls_over_all.c "32"
 	./assert.sh ./reference/function_calls_with_arguments.c "7"
 	./assert.sh ./reference/function_calls_with_arguments_inline.c "14"
+	./assert.sh ./reference/function_write_syscall.c "0" "example"
 
 tests: run_baby_compiler_tests 
 	echo "Good compiler :)"

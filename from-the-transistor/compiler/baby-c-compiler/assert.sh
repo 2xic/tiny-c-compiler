@@ -11,19 +11,37 @@ if [ -z "$2" ]
     exit 1
 fi
 
+
 python3 -m baby_compiler.compiler $1 ./reference/_temp_baby_c.s
 
 gcc -c reference/_temp_baby_c.s -o file.o
 ld file.o -o yourprogram.o
-./yourprogram.o 
+output=$(./yourprogram.o )
 status=$?
+
 if test "$status" = "$2"
 then
-    echo "Strings are equal"
-    exit 0
+    echo "Exit codes are equal"
 else
-    echo "Strings are not equal"
+    echo "Exit codes are not equal"
     echo "Expected == $2"
     echo "Got === $status"
     exit 1
+fi
+
+if [ ! -z "$3" ]
+  then
+    #echo "Got another field :)"
+    #echo $output
+    #echo $3
+    #exit 0
+    if test "$output" = "$3"
+    then
+        echo "Output are equal"
+    else
+        echo "Output are not equal"
+        echo "Expected == $3"
+        echo "Got === $output"
+        exit 1
+    fi
 fi

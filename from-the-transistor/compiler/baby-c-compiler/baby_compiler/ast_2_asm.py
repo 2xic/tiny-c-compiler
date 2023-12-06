@@ -1,7 +1,7 @@
 """
 We got nice AST output, we need nice output :)
 """
-from .ast import File, FunctionDefinition, ReturnDefinition, FunctionBody, VariableDeclaration, NumericValue, MathOp, VariableAssignment, FunctionCall, VariableReference
+from .ast import File, FunctionDefinition, ReturnDefinition, FunctionBody, VariableDeclaration, NumericValue, MathOp, VariableAssignment, FunctionCall, VariableReference,Parameters, StringValue
 
 
 class AsmOutputStream:
@@ -44,6 +44,7 @@ def create_sys_exit(exit_code):
     int     $0x80
         """
 
+
 class Ast2Asm:
     def __init__(self, ast: File) -> None:
         self.ast = ast
@@ -60,6 +61,10 @@ class Ast2Asm:
 
         # TODO: Make this part of the node instead
         self.current_function = None
+        self.built_in_functions = {
+            "write":SyswriteMapping()
+        }
+
 
     def get_asm(self):
         """
@@ -172,14 +177,23 @@ class Ast2Asm:
                     f"\tmovl %eax, {node.v_reference}"
                 )
         elif isinstance(node, FunctionCall):
-               for i in node.parameters.child_nodes:
-                    if isinstance(i, NumericValue):
-                       output.append(f"\tpush ${i.value}")
-                    else:
-                        raise Exception("Unknown parameter")
-               output.append(
-                    f"\tcall {node.function_name}"
-                )
+               if node.function_name in self.built_in_functions:
+                    self.built_in_functions[node.function_name].convert(
+                        node.parameters.child_nodes,
+                        self,
+                        output
+                    )
+               else:
+                    for i in node.parameters.child_nodes:
+                        if isinstance(i, NumericValue):
+                            output.append(f"\tpush ${i.value}")
+                        elif isinstance(i, StringValue):
+                            print("WRITE STRINGS To RO SECTION!")
+                        else:
+                            raise Exception("Unknown parameter")
+                    output.append(
+                        f"\tcall {node.function_name}"
+                    )
         else:
             print(node)
             raise Exception("Unknown node " + str(node))    
@@ -208,4 +222,33 @@ class Ast2Asm:
         self.convert_nodes(node, output)
         output.append(
             f"\taddl %ebx, %eax"
+        )
+
+
+class SyswriteMapping:
+    def __init__(self) -> None:
+        pass
+
+    def convert(self, parameters, asm_root: Ast2Asm, output: AsmOutputStream):
+        assert isinstance(parameters[0], NumericValue)
+        assert isinstance(parameters[1], NumericValue)
+        assert isinstance(parameters[2], StringValue)
+        string_value = parameters[2].value
+        asm_root.data_sections.append(
+            f"\tmessage:  .ascii  \"{string_value}\""
+        )
+        output.append(
+            "\tmov     $1, %rax",
+        )
+        output.append(
+            "\tmov     $1, %rdi",
+        )
+        output.append(
+            "\tlea     message(%rip), %rsi",
+        )
+        output.append(
+            f"\tmov     ${len(string_value)}, %rdx"
+        )
+        output.append(
+            "\tsyscall"
         )
