@@ -91,6 +91,9 @@ So based on tokens I create outputs.
 class Nodes:
     def __init__(self) -> None:
         self.child_nodes = []
+        # Filled in automatically later
+        self.id = None
+        self.parent = None
 
     def __str__(self) -> str:
         # lol
@@ -206,14 +209,18 @@ class VariableAssignment(Nodes):
 class VariableReference(Nodes):
     def __init__(self, variable) -> None:
         super().__init__()
-
         self.variable = variable
-
+        self.child_nodes = [
+            variable
+        ]
 
 class NumericValue(Nodes):
     def __init__(self, value) -> None:
         super().__init__()
         self.value = value
+        self.child_nodes = [
+            value
+        ]
 
     def __str__(self) -> str:
         return self.value
@@ -225,6 +232,9 @@ class StringValue(Nodes):
     def __init__(self, value) -> None:
         super().__init__()
         self.value = value
+        self.child_nodes = [
+            value
+        ]
 
     def __str__(self) -> str:
         return self.value
@@ -232,30 +242,66 @@ class StringValue(Nodes):
     def __repr__(self) -> str:
         return super().__repr__()
     
-class Conditionals:
+class Conditionals(Nodes):
     def __init__(self, if_condition, else_condition) -> None:
-        self. if_condition =  if_condition
+        super().__init__()
+        self.if_condition =  if_condition
         self.else_condition = else_condition
+        self.child_nodes = [
+            if_condition,
+            else_condition,
+        ]
 
 
-class IfCondition:
+class IfCondition(Nodes):
     def __init__(self, condition, body) -> None:
+        super().__init__()
         self.condition = condition
         self.body = body
+        self.child_nodes = [
+            condition,
+            body
+        ]
 
-class ElseCondition:
+class ElseCondition(Nodes):
     def __init__(self, body) -> None:
+        super().__init__()
         self.body = body
+        self.child_nodes = [
+            body
+        ]
 
-class ConditionCheck:
+class ConditionCheck(Nodes):
     def __init__(self, value) -> None:
+        super().__init__()
         self.value = value
+        self.child_nodes = [
+            value
+        ]
 
-class Equal:
+
+class Equal(Nodes):
     def __init__(self, a, b) -> None:
+        super().__init__()
         self.a = a 
         self.b = b
+        self.child_nodes = [
+            a, b
+        ]
 
+class AssignGlobalValues:
+    def __init__(self) -> None:
+        self.id = 0
+
+    def assign_scope(self, node: Nodes):
+        for i in node.child_nodes:
+            # TODO: All nodes should use nodes
+            if isinstance(i, Nodes):
+                setattr(i, "id", self.id)
+                setattr(i, "parent", node)
+                self.id += 1
+                self.assign_scope(i)
+        return node
 
 class AST:
     def __init__(self, tokens) -> None:
@@ -265,11 +311,13 @@ class AST:
         }
         # Need to reconsider this... Is this how we want to create the tree?
         self.variables = {}
+        self.id = 0
         self.tokens_index = TokenConsumer(self.tokens)
 
     def build_ast(self):
         # Statements currently supported are only tokens
         file = File("example.c")
+        assign_global_values = AssignGlobalValues()
 
         prev_token = -1
         while prev_token !=  self.tokens_index.index and self.tokens_index.index < len(self.tokens):
@@ -277,7 +325,7 @@ class AST:
             file_nodes = self.get_root_symbols()
             file.child_nodes.append(file_nodes)
             if isinstance(file_nodes, FunctionDefinition):
-                file.functions[file_nodes.name] = file_nodes
+                file.functions[file_nodes.name] = assign_global_values.assign_scope(file_nodes)
         assert self.tokens_index.index == len(self.tokens),  "Failed to parse source code..."
         return file
 

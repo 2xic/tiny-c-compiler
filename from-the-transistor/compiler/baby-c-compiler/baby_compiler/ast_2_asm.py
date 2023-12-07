@@ -130,7 +130,7 @@ class Ast2Asm:
             for i in node.child_nodes:
                 self.convert_nodes(i, output)
                 if isinstance(i, Conditionals):
-                    output.append("end_of_if:")
+                    output.append(f"end_of_if_{i.id}:")
         elif isinstance(node, ReturnDefinition):
             if output.is_main:
                 # technically it should only be a exit if this is the main opcode ...
@@ -206,11 +206,14 @@ class Ast2Asm:
 
         elif isinstance(node, IfCondition):
             self.convert_nodes(node.condition, output)
-            output.append("loc_a:")
+            assert isinstance(node.parent, Conditionals), node.parent
+            output.append(f"loc_{node.id}:")
             self.convert_nodes(node.body, output)
-            output.append("\tjmp end_of_if")
+            end_of_id = node.parent.id
+            output.append(f"\tjmp end_of_if_{end_of_id}")
         elif isinstance(node, ElseCondition):
-            output.append("loc_b:")
+#            output.append("loc_b:")
+            output.append(f"loc_{node.id}:")
             # else:
             self.convert_nodes(node.body, output)
         elif isinstance(node, Equal):
@@ -220,9 +223,10 @@ class Ast2Asm:
             output.append(
                 f"\tcmpl ${b.value}, {a.variable}"
             )
+            assert isinstance(node.parent.parent, Conditionals), node.parent.parent
             # todo: hardcoded ... fix
             output.append(
-                f"\tjne loc_b"
+                f"\tjne loc_{node.parent.parent.else_condition.id}"
             )
         else:
             print(node)
