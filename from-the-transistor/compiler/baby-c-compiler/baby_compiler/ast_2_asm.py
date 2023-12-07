@@ -1,7 +1,7 @@
 """
 We got nice AST output, we need nice output :)
 """
-from .ast import File, FunctionDefinition, ReturnDefinition, FunctionBody, VariableDeclaration, NumericValue, MathOp, VariableAssignment, FunctionCall, VariableReference, StringValue, Conditionals, IfCondition, ElseCondition, Equal
+from .ast import File, FunctionDefinition, ReturnDefinition, FunctionBody, VariableDeclaration, NumericValue, MathOp, VariableAssignment, FunctionCall, VariableReference, StringValue, Conditionals, IfCondition, ElseCondition, Equal, WhileConditional
 
 
 class AsmOutputStream:
@@ -164,9 +164,6 @@ class Ast2Asm:
             # This should also zero out eax ....
             # ^ technically I think we should zero eax at a different point, but okay
             output.append(
-                f"\tmovl $0, {node.v_reference}"
-            )
-            output.append(
                 f"\tmovl $0, %eax"
             )
             # do the math
@@ -207,14 +204,19 @@ class Ast2Asm:
         elif isinstance(node, IfCondition):
             self.convert_nodes(node.condition, output)
             assert isinstance(node.parent, Conditionals), node.parent
+            #assert isinstance(node.parent.parent, Conditionals), node.parent.parent
+            # todo: hardcoded ... fix
+            # also this should not be applied here lol.
+            output.append(
+                f"\tjne loc_{node.parent.else_condition.id}"
+            )
+
             output.append(f"loc_{node.id}:")
             self.convert_nodes(node.body, output)
             end_of_id = node.parent.id
             output.append(f"\tjmp end_of_if_{end_of_id}")
         elif isinstance(node, ElseCondition):
-#            output.append("loc_b:")
             output.append(f"loc_{node.id}:")
-            # else:
             self.convert_nodes(node.body, output)
         elif isinstance(node, Equal):
             # I want to simple resolve here, variable reference are hard to think about ... 
@@ -223,13 +225,17 @@ class Ast2Asm:
             output.append(
                 f"\tcmpl ${b.value}, {a.variable}"
             )
-            assert isinstance(node.parent.parent, Conditionals), node.parent.parent
-            # todo: hardcoded ... fix
-            output.append(
-                f"\tjne loc_{node.parent.parent.else_condition.id}"
-            )
+        elif isinstance(node, WhileConditional):
+            # Need to check this and then jump ...
+            output.append("jmp loop1")
+            # Jump to the conditional
+            output.append("cloop1:")
+#            print(node.body)
+            self.convert_nodes(node.body, output)
+            output.append("\tloop1:")
+            self.convert_nodes(node.conditional, output)
+            output.append("je cloop1")
         else:
-            print(node)
             raise Exception("Unknown node " + str(node))    
     
     def handle_math_opcodes(self, node, output):
@@ -243,11 +249,14 @@ class Ast2Asm:
             pass
         elif isinstance(node, VariableReference):
             # This way of looking up the arguments should be made illegal, plz fix it.
+            found_match = False
             for index, i in enumerate(self.current_function.parameters.child_nodes):
                 if i.name == node.variable:
                     output.append(f"\taddl {8 * (index + 1)}(%rsp), %eax")
+                    found_match = True
                     break
-            #raise Exception(f"Unknown math op node ({node})")
+            if not found_match:
+                output.append(f"\taddl {node.variable}, %eax")
         else:
             raise Exception(f"Unknown math op node ({node})")
         

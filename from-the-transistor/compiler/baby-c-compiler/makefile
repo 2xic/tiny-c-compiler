@@ -34,6 +34,8 @@ run_baby_compiler_tests:
 	./assert.sh ./reference/function_if_statments_with_if_branch.c "0" "yes"
 	./assert.sh ./reference/function_if_statments_with_else_branch.c "3" "No"
 	./assert.sh ./reference/function_multiple_if_change_return_code.c "14" ""
+	./assert.sh ./reference/simple_increment.c "2" ""
+	./assert.sh ./reference/while_loops.c "10" ""
 
 tests: run_baby_compiler_tests 
 	echo "Good compiler :)"

@@ -1,7 +1,7 @@
 """
 The AST has the ast logic.
 """
-
+from typing import Optional
 class Token:
     def __init__(self, value) -> None:
         self.value = value
@@ -92,8 +92,8 @@ class Nodes:
     def __init__(self) -> None:
         self.child_nodes = []
         # Filled in automatically later
-        self.id = None
-        self.parent = None
+        self.id: int = None
+        self.parent: Optional[Nodes] = None
 
     def __str__(self) -> str:
         # lol
@@ -252,6 +252,15 @@ class Conditionals(Nodes):
             else_condition,
         ]
 
+class WhileConditional(Nodes):
+    def __init__(self, conditional, body) -> None:
+        super().__init__()
+        self.conditional = conditional 
+        self.body =  body
+        self.child_nodes = [
+            self.conditional,
+            self.body
+        ]
 
 class IfCondition(Nodes):
     def __init__(self, condition, body) -> None:
@@ -532,18 +541,34 @@ class AST:
                 # TODO: else if 
                 else_condition=self.parse_if_statements(can_be_if=False),
             )
+        elif  self.tokens_index.peek_token(0) == "(" and token == "while":
+            assert self.tokens_index.get_token() == "("
+            return WhileConditional(
+                conditional=self.get_conditional_equal(),
+                body=self.parse_function_body()
+            )
+            
 
     def parse_if_statements(self, can_be_if=False):
         if can_be_if:
             return self.parse_condition_body()
         else:
-            token = self.tokens_index.get_token()
-            if  self.tokens_index.peek_token(0) == "{" and token == "else":
+            token = self.tokens_index.peek_token(0)
+            if  self.tokens_index.peek_token(1) == "{" and token == "else":
+                assert self.tokens_index.get_token() == "else"
                 return ElseCondition(
                     body=self.parse_function_body()
                 )
 
     def parse_condition_body(self):
+        equal = self.get_conditional_equal()
+        if equal is not None:
+            return IfCondition(
+                condition=equal,
+                body=self.parse_function_body()
+            )
+
+    def get_conditional_equal(self):
         token = self.tokens_index.get_token()
         if self.tokens_index.get_token() == "==":
             if token in self.variables:
@@ -553,17 +578,13 @@ class AST:
                 if second_expression.isnumeric():
                     second_expression = NumericValue(second_expression)
                     assert self.tokens_index.get_token() == ")"
-                    results = IfCondition(
-                        condition=Equal(
-                            first_expression,
-                            second_expression
-                        ),
-                        body=self.parse_function_body()
+                    return Equal(
+                        first_expression,
+                        second_expression
                     )
-                    print((results))
-                    return results
                 else:
                     raise Exception("Failed ")
             else:
                 raise Exception("Not supported yet ... ")
-
+        return None
+    
