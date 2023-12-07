@@ -36,6 +36,8 @@ run_baby_compiler_tests:
 	./assert.sh ./reference/function_multiple_if_change_return_code.c "14" ""
 	./assert.sh ./reference/simple_increment.c "2" ""
 	./assert.sh ./reference/while_loops.c "10" ""
+	./assert.sh ./reference/while_loops_without_else.c "10" ""
+	./assert.sh ./reference/variable_assigments.c "2" ""
 
 tests: run_baby_compiler_tests 
 	echo "Good compiler :)"

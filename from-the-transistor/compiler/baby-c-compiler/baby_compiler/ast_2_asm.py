@@ -26,7 +26,7 @@ f"""
 def create_sys_exit(exit_code):
     if isinstance(exit_code, NumericValue):
         return f"""
-    movl    ${exit_code}, %ebx
+    movl    ${exit_code.value}, %ebx
     movl    $1, %eax
     int     $0x80
         """
@@ -122,10 +122,23 @@ class Ast2Asm:
             )
             if not node.value is None:
                 # Else the node has to write the data to %eax at some point during the evaluation
-                self.convert_nodes(node.value, output) 
-                output.append(
-                    f"\tmovl %eax, {node.name}"
-                )
+                if isinstance(node.value, NumericValue):
+                    output.append(
+                        f"\tmovl ${node.value.value}, {node.name}"
+                    )
+                elif isinstance(node.value, VariableReference):
+                    # swappy memory yes yes yes 
+                    output.append(
+                        f"\tmovl {node.value.variable}, %eax"
+                    )
+                    output.append(
+                        f"\tmovl %eax, {node.name}"
+                    )
+                else:
+                    self.convert_nodes(node.value, output) 
+                    output.append(
+                        f"\tmovl %eax, {node.name}"
+                    )
         elif isinstance(node, FunctionBody):
             for i in node.child_nodes:
                 self.convert_nodes(i, output)
@@ -145,7 +158,7 @@ class Ast2Asm:
                 if isinstance(node.value, NumericValue):
                     # We return a static value ? 
                     # okay 
-                    output.append(f"\tmovl    ${node.value}, %eax")
+                    output.append(f"\tmovl    ${node.value.value}, %eax")
                 elif isinstance(node.value, MathOp):
                     self.convert_nodes(node.value, output)
                 
@@ -166,6 +179,7 @@ class Ast2Asm:
             output.append(
                 f"\tmovl $0, %eax"
             )
+            print("node, === ", node)
             # do the math
             if isinstance(node.value, NumericValue):
                 output.append(
@@ -198,22 +212,25 @@ class Ast2Asm:
             self.convert_nodes(node.if_condition, output)
             # Then we need to jump 
             # Then we can next condition, but not write to it yet.  
-           # b_else_condition = AsmOutputStream()
-            self.convert_nodes(node.else_condition, output)
-
+            if node.else_condition is not None:
+                self.convert_nodes(node.else_condition, output)
         elif isinstance(node, IfCondition):
             self.convert_nodes(node.condition, output)
             assert isinstance(node.parent, Conditionals), node.parent
             #assert isinstance(node.parent.parent, Conditionals), node.parent.parent
             # todo: hardcoded ... fix
             # also this should not be applied here lol.
-            output.append(
-                f"\tjne loc_{node.parent.else_condition.id}"
-            )
-
+            end_of_id = node.parent.id
+            if node.parent.else_condition is not None:
+                output.append(
+                    f"\tjne loc_{node.parent.else_condition.id}"
+                )
+            else:
+                output.append(
+                    f"\tjne end_of_if_{end_of_id}"
+                )
             output.append(f"loc_{node.id}:")
             self.convert_nodes(node.body, output)
-            end_of_id = node.parent.id
             output.append(f"\tjmp end_of_if_{end_of_id}")
         elif isinstance(node, ElseCondition):
             output.append(f"loc_{node.id}:")
@@ -240,7 +257,7 @@ class Ast2Asm:
     
     def handle_math_opcodes(self, node, output):
         if isinstance(node, NumericValue):
-            output.append(f"\taddl ${node}, %eax")
+            output.append(f"\taddl ${node.value}, %eax")
         elif isinstance(node, MathOp):
             self.convert_nodes(node, output)                
         elif isinstance(node, FunctionCall):

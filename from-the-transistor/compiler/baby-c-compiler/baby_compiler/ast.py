@@ -222,12 +222,6 @@ class NumericValue(Nodes):
             value
         ]
 
-    def __str__(self) -> str:
-        return self.value
-
-    def __repr__(self) -> str:
-        return super().__repr__()
-
 class StringValue(Nodes):
     def __init__(self, value) -> None:
         super().__init__()
@@ -236,12 +230,6 @@ class StringValue(Nodes):
             value
         ]
 
-    def __str__(self) -> str:
-        return self.value
-
-    def __repr__(self) -> str:
-        return super().__repr__()
-    
 class Conditionals(Nodes):
     def __init__(self, if_condition, else_condition) -> None:
         super().__init__()
