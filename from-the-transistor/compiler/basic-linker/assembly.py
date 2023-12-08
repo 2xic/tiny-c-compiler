@@ -1,9 +1,13 @@
 from keystone import *
-CODE = "\n".join([
-    "movl $2, a"
-])
-ks = Ks(KS_ARCH_X86, KS_MODE_64)
-ks.syntax = KS_OPT_SYNTAX_INTEL
-encoding, count = ks.asm(CODE)
-print(encoding)
 
+# separate assembly instructions by ; or \n
+CODE = b"INC ecx; DEC edx"
+
+try:
+    # Initialize engine in X86-32bit mode
+    ks = Ks(KS_ARCH_X86, KS_MODE_32)
+    encoding, count = ks.asm(CODE)
+   # print("%s = %s (number of statements: %u)" %(CODE, encoding, count))
+    print(bytes(encoding))
+except KsError as e:
+    print("ERROR: %s" %e)

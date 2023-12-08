@@ -13,6 +13,11 @@ class BytesValue:
     def __bytes__(self):
         return self.value
     
+    @staticmethod
+    def from_numeric(value, bytes_size):
+        encoded = (value).to_bytes( bytes_size, byteorder='little') 
+#        padding = b"\x00" * (bytes_size - len(encoded))
+        return BytesValue( encoded  )
 
 class Steamer:
     def __init__(self, bytes) -> None:
@@ -305,36 +310,52 @@ class ElfParser:
         - Sections of data and code
         - Sections header
         """
+        sorted_sections =  sorted(self.sections, key=lambda x: x.sh_offset.numeric_value )
+
         output = bytes()
+        #self.file_header.shentsize = BytesValue.from_numeric(
+        #    self._modify_text_sections(new_bytes)
+        #)
+        self._modify_text_sections(sorted_sections, new_bytes)
+
+        print("YEYE")
+        print(self.file_header.shentsize.numeric_value)
+        #print(BytesValue.from_numeric(
+        #    self._modify_text_sections(new_bytes)
+        #).numeric_value)
+        
         output += bytes(self.file_header)
         for i in self.program_header:
             output += bytes(i)
+        
         delta_sections = 0
-        for index, i in enumerate( sorted(self.sections, key=lambda x: x.sh_offset.numeric_value )):
+        for index, i in enumerate(sorted_sections):
+            #print((delta_sections, i.sh_offset.numeric_value, i.data.hex()))
             if index > 1:
-                if (i.sh_offset.numeric_value - delta_sections) > 0:
-                    output += b"\x00" * (i.sh_offset.numeric_value - delta_sections)                
+                need_to_align = i.sh_offset.numeric_value - delta_sections
+                if need_to_align > 0:
+                    output += b"\x00" * need_to_align                
+            # add the output data and new assignment location
             output += i.data
-            delta_sections = (i.sh_offset.numeric_value + i.sh_size.numeric_value)
-        ## output += bytes.fromhex("f00dbabe")
+            delta_sections = i.sh_offset.numeric_value + i.sh_size.numeric_value
+        # Need to align ? Maybe ? 
         delta = self.file_header.shoff.numeric_value - len(output)
         output += b"\x00" * delta
-        print((delta))
         for i in self.sections:
             output += bytes(i)
         return output
-
     
-if __name__ == "__main__":
-    with open("bins/main.o", "rb") as file:
-        bytes_raw = file.read()
-        elf = ElfParser(bytes_raw)
-        # If I modify a header, then I need to adjust all the headers that is within this scope ? Right ? 
-        print(elf.sections[1].data)
-        print("recounstrcted output")
-        print(elf.modify_text_section(
-            elf.sections[1].data + elf.sections[1].data
-        ).hex())
-        print("=" * 32)
-        print("Real output")
-        print(bytes_raw.hex())
+    def _modify_text_sections(self, sorted_sections, new_bytes):
+        delta_sections = 0
+        size = 0
+        for _, i in enumerate(sorted_sections):
+            if i.name.decode('utf-8') == ".text":
+                delta = len(new_bytes) - len(i.data)
+                i.sh_size = BytesValue.from_numeric(len(new_bytes), len(i.sh_size.value))
+                delta_sections += delta
+            else:
+                i.sh_offset = BytesValue.from_numeric(delta_sections + i.sh_offset.numeric_value, len(i.sh_offset.bytes))
+            size += i.sh_size.numeric_value
+        return size
+        
+
