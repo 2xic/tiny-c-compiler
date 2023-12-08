@@ -19,3 +19,7 @@ So in the assembly file they just mark it as a `@PLT` section
 - Resolve unresolved symbols
 - 
 - 
+
+## Elf
+- https://nutcrackerssecurity.github.io/posts/elf-binary/
+- 

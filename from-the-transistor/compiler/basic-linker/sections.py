@@ -17,8 +17,4 @@ with open('./bins/main.o', 'rb') as f:
                 symbol = symbol_table.get_symbol(relocation['r_info_sym'])
                 addr = hex(relocation['r_offset'])
                 print(f'{symbol.name} {addr}')
-            #    exit(0)
 
-"""
-
-"""
