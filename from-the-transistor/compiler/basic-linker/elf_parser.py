@@ -2,6 +2,9 @@
 No libraries that I can easily modify the .text section with - I'm so sad
 
 I'll make it myself
+
+https://dev.to/icyphox/python-for-reverse-engineering-1-elf-binaries-1fo4
+
 """
 
 class BytesValue:
@@ -103,8 +106,8 @@ class FileHeader:
 
     def get_program_header(self, streamer: Steamer):
         return streamer.stream(
-            (self.phoff.numeric_value),
-            (self.phentsize.numeric_value),
+            self.phoff.numeric_value,
+            self.phentsize.numeric_value,
         )
 
     def get_section_names_index(self):
@@ -183,15 +186,15 @@ class ProgramHeader:
 
     def __bytes__(self):
         return bytes(
-            self.p_type +\
-            self.p_flags +\
-            self.p_offset +\
-            self.p_vaddr +\
-            self.p_paddr +\
-            self.p_filesz +\
-            self.p_memsz +\
-            self.p_flags +\
-            self.p_align
+            self.p_type.bytes +\
+            self.p_flags.bytes +\
+            self.p_offset.bytes +\
+            self.p_vaddr.bytes +\
+            self.p_paddr.bytes +\
+            self.p_filesz.bytes +\
+            self.p_memsz.bytes +\
+            self.p_flags.bytes +\
+            self.p_align.bytes
         )
 
 class SectionHeader:
@@ -302,6 +305,7 @@ class ElfParser:
             )
         self.program_header = output  
     
+
     def modify_text_section(self, new_bytes):
         """
         Structure of the ELF
@@ -312,26 +316,26 @@ class ElfParser:
         """
         sorted_sections =  sorted(self.sections, key=lambda x: x.sh_offset.numeric_value )
 
-        output = bytes()
-        #self.file_header.shentsize = BytesValue.from_numeric(
-        #    self._modify_text_sections(new_bytes)
-        #)
         self._modify_text_sections(sorted_sections, new_bytes)
 
-        print("YEYE")
-        print(self.file_header.shentsize.numeric_value)
-        #print(BytesValue.from_numeric(
-        #    self._modify_text_sections(new_bytes)
-        #).numeric_value)
-        
+        return self.__bytes__()
+    
+    def __bytes__(self):
+        sorted_sections =  sorted(self.sections, key=lambda x: x.sh_offset.numeric_value )
+        sorted_program_headers =  sorted(self.program_header, key=lambda x: x.p_offset.numeric_value )
+        output = bytes()
+        # file header
         output += bytes(self.file_header)
-        for i in self.program_header:
+        # program headers
+        for i in sorted_program_headers:
+            print(i.p_offset.numeric_value)
             output += bytes(i)
-        
+
         delta_sections = 0
+        use_align = True
+        # SECTION DATA
         for index, i in enumerate(sorted_sections):
-            #print((delta_sections, i.sh_offset.numeric_value, i.data.hex()))
-            if index > 1:
+            if index > 1 and use_align:
                 need_to_align = i.sh_offset.numeric_value - delta_sections
                 if need_to_align > 0:
                     output += b"\x00" * need_to_align                
@@ -339,12 +343,15 @@ class ElfParser:
             output += i.data
             delta_sections = i.sh_offset.numeric_value + i.sh_size.numeric_value
         # Need to align ? Maybe ? 
-        delta = self.file_header.shoff.numeric_value - len(output)
-        output += b"\x00" * delta
+        if use_align:
+            delta = self.file_header.shoff.numeric_value - len(output)
+            output += b"\x00" * delta
+        # SECTIONS HEADERS
         for i in self.sections:
             output += bytes(i)
         return output
-    
+        
+
     def _modify_text_sections(self, sorted_sections, new_bytes):
         delta_sections = 0
         size = 0
@@ -352,9 +359,13 @@ class ElfParser:
             if i.name.decode('utf-8') == ".text":
                 delta = len(new_bytes) - len(i.data)
                 i.sh_size = BytesValue.from_numeric(len(new_bytes), len(i.sh_size.value))
+                i.data = new_bytes
                 delta_sections += delta
             else:
-                i.sh_offset = BytesValue.from_numeric(delta_sections + i.sh_offset.numeric_value, len(i.sh_offset.bytes))
+                current_offset = i.sh_offset
+                i.sh_offset = BytesValue.from_numeric(delta_sections + current_offset.numeric_value, len(current_offset.bytes))
+                if delta_sections:
+                    print("Moved the section a bit ...", i.name, delta_sections)
             size += i.sh_size.numeric_value
         return size
         

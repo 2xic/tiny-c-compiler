@@ -22,4 +22,9 @@ So in the assembly file they just mark it as a `@PLT` section
 
 ## Elf
 - https://nutcrackerssecurity.github.io/posts/elf-binary/
-- 
+
+## Inspecting elf 
+```
+readelf -l ./elf_file
+```
+
