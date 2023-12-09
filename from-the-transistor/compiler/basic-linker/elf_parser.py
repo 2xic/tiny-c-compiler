@@ -28,14 +28,12 @@ class Steamer:
         self.index = 0
         
     def read(self, size):
+        if size == 0:
+            return BytesValue(b'')
         content = self.bytes[self.index:self.index + size]
         self.index += size
         return BytesValue(content + b'')
-    
-    def read_numeric(self, size):
-        bytes = self.read(size)
-        return bytes.numeric_value
-    
+        
     def conditional_read(self, is_64_bit, bit_32, bit_64):
         if is_64_bit:
             return self.read(bit_64)
@@ -50,50 +48,53 @@ class Steamer:
         ]
     
 class FileHeader:
-    def __init__(self, bytes: Steamer) -> None:
-        self.magic_bytes = bytes.read(4)
+    def __init__(self, streamer: Steamer) -> None:
+        self.magic_bytes = streamer.read(4)
         assert self.magic_bytes.value == b"\x7fELF", self.magic_bytes
-        self.is_64_bit_bytes = bytes.read(1)
+        self.is_64_bit_bytes = streamer.read(1)
         # numeric debug
         self.is_64_bit = self.is_64_bit_bytes.numeric_value == 2
         
-        self.big_endianness_bytes = bytes.read(1)
+        self.big_endianness_bytes = streamer.read(1)
         # nuermic debug
         self.big_endianness = self.big_endianness_bytes.numeric_value == 2
         
-        self.version = bytes.read(1) 
-        self.os = bytes.read(1) # this is a lookup lsit
-        self.abi_version = bytes.read(1)
-        self.padding = bytes.read(7)
-        self.object_type = bytes.read(2) 
-        self.machine = bytes.read(2)
-        self.elf_version = bytes.read(4)
+        self.version = streamer.read(1) 
+        self.os = streamer.read(1) # this is a lookup lsit
+        self.abi_version = streamer.read(1)
+        self.padding = streamer.read(7)
+        self.object_type = streamer.read(2) 
+        self.machine = streamer.read(2)
+        self.elf_version = streamer.read(4)
 
-        assert bytes.index in [0x18], bytes.index # before the split
+        assert streamer.index in [0x18], streamer.index # before the split
 
-        self.entry = bytes.conditional_read(
+        self.entry = streamer.conditional_read(
             is_64_bit=self.is_64_bit,
             bit_32=4,
             bit_64=8
         )       
-        self.phoff = bytes.conditional_read(
+        self.phoff = streamer.conditional_read(
             is_64_bit=self.is_64_bit,
             bit_32=4,
             bit_64=8
         )     
-        self.shoff = bytes.conditional_read( # e_shoff
+        self.shoff = streamer.conditional_read( # e_shoff
             is_64_bit=self.is_64_bit,
             bit_32=4,
             bit_64=8
         )      
-        self.flags = bytes.read(4)
-        self.ehsize = bytes.read(2)
-        self.phentsize = bytes.read(2)
-        self.phnum = bytes.read(2)
-        self.shentsize = bytes.read(2)
-        self.shnum = bytes.read(2) # shnum
-        self.shstrndx = bytes.read(2)
-        assert bytes.index in [0x34, 0x40], bytes.index # 32 bit or 64 bit
+        self.flags = streamer.read(4)
+        self.ehsize = streamer.read(2)
+        self.phentsize = streamer.read(2)
+        self.phnum = streamer.read(2)
+        self.shentsize = streamer.read(2)
+        self.shnum = streamer.read(2) # shnum
+        self.shstrndx = streamer.read(2)
+        assert streamer.index in [0x34, 0x40], bytes.index # 32 bit or 64 bit
+
+        expected_size = 0x40 if self.is_64_bit else 0x34
+        assert bytes(self).hex() == streamer.bytes[streamer.index-expected_size:streamer.index].hex()
 
     def get_entry_point(self):
         return self.entry
@@ -105,9 +106,11 @@ class FileHeader:
         )
 
     def get_program_header(self, streamer: Steamer):
+#        print(self.phoff.numeric_value)
+        assert self.phoff.numeric_value in [0x34, 0x40, 0x0] # This is normally where it starts, but could be different
         return streamer.stream(
             self.phoff.numeric_value,
-            self.phentsize.numeric_value,
+            self.phnum.numeric_value,
         )
 
     def get_section_names_index(self):
@@ -140,60 +143,81 @@ class FileHeader:
         return output
 class ProgramHeader:
     def __init__(self, is_64_bit, streamer: Steamer) -> None:
+        # Notes from https://en.wikipedia.org/wiki/Executable_and_Linkable_Format#Program_header
         start_offset = streamer.index
-        self.p_type = streamer.read(4)
-        self.p_flags = streamer.conditional_read(
+        self.p_type = streamer.read(4) # Identifies the type of the segment. 
+        self.p_flags_64 = streamer.conditional_read(
             is_64_bit=is_64_bit,
             bit_32=0,
             bit_64=4
-        )
+        ) # Segment-dependent flags (position for 64-bit structure)
         self.p_offset = streamer.conditional_read(
             is_64_bit=is_64_bit,
             bit_32=4,
             bit_64=8
-        )
+        ) # Offset of the segment in the file image. 
         self.p_vaddr = streamer.conditional_read(
             is_64_bit=is_64_bit,
             bit_32=4,
             bit_64=8
-        )
+        ) # Virtual address of the segment in memory. 
         self.p_paddr = streamer.conditional_read(
             is_64_bit=is_64_bit,
             bit_32=4,
             bit_64=8
-        )
+        ) # On systems where physical address is relevant, reserved for segment's physical address. 
         self.p_filesz = streamer.conditional_read(
             is_64_bit=is_64_bit,
             bit_32=4,
             bit_64=8
-        )
+        ) # Size in bytes of the segment in the file image. May be 0. 
         self.p_memsz = streamer.conditional_read(
             is_64_bit=is_64_bit,
             bit_32=4,
             bit_64=8
-        )
-        self.p_flags = streamer.conditional_read(
+        ) # Size in bytes of the segment in memory. May be 0. 
+        self.p_flags_32 = streamer.conditional_read(
             is_64_bit=is_64_bit,
             bit_32=4,
             bit_64=0,
-        )
+        ) # Segment-dependent flags (position for 32-bit structure). See above p_flags field for flag definitions. 
         self.p_align = streamer.conditional_read(
             is_64_bit=is_64_bit,
             bit_32=4,
             bit_64=8,
-        )
-        assert (streamer.index - start_offset) in [0x20, 0x38], (streamer.index - start_offset) # 32 bit or 64 bit
+        ) # 0 and 1 specify no alignment. Otherwise should be a positive, integral power of 2, with p_vaddr equating p_offset modulus p_align. 
+        assert (streamer.index - start_offset) in [0x20, 0x38], (streamer.index - start_offset) # 32 bit or 64 bit        
+        expected_size = 0x38 if is_64_bit else 0x20
+        assert bytes(self).hex() == streamer.bytes[streamer.index-expected_size:streamer.index].hex()
+
+    def __str__(self) -> str:
+        program_header_type = {
+            0x00000000: "PT_NULL",
+            0x00000001: "PT_LOAD",
+            0x00000002: "PT_DYNAMIC",
+            0x00000003: "PT_INTERP",
+            0x00000004: "PT_NOTE",
+            0x00000005: "PT_SHLIB",
+            0x00000006: "PT_PHDR",
+            0x00000007: "PT_TLS",
+            0x60000000: "PT_LOOS",
+            0x6FFFFFFF: "PT_HIOS",
+            0x70000000: "PT_LOPROC",
+            0x7FFFFFFF: "PT_HIPROC",
+        }
+        type = program_header_type[self.p_type.numeric_value]
+        return f"Program header {type} "
 
     def __bytes__(self):
         return bytes(
             self.p_type.bytes +\
-            self.p_flags.bytes +\
+            self.p_flags_64.bytes +\
             self.p_offset.bytes +\
             self.p_vaddr.bytes +\
             self.p_paddr.bytes +\
             self.p_filesz.bytes +\
             self.p_memsz.bytes +\
-            self.p_flags.bytes +\
+            self.p_flags_32.bytes +\
             self.p_align.bytes
         )
 
@@ -217,7 +241,7 @@ class SectionHeader:
             is_64_bit=is_64_bit,
             bit_32=4,
             bit_64=8,
-        )
+        ) # Offset of the section in the file image. 
         self.sh_size = streamer.conditional_read(
             is_64_bit=is_64_bit,
             bit_32=4,
@@ -237,9 +261,12 @@ class SectionHeader:
         )
         assert (streamer.index - start_offset) in [0x28, 0x40], (streamer.index - start_offset) # 32 bit or 64 bit
 
-        start_offset = self.sh_offset.numeric_value
-        end_offset = start_offset + self.sh_size.numeric_value
-        self.data = streamer.bytes[start_offset:end_offset]
+        self.start_offset = self.sh_offset.numeric_value
+        self.end_offset = self.start_offset + self.sh_size.numeric_value
+        self.data = streamer.bytes[self.start_offset:self.end_offset]
+
+        expected_size = 0x40 if is_64_bit else 0x28
+        assert bytes(self).hex() == streamer.bytes[streamer.index-expected_size:streamer.index].hex()
 
     def __bytes__(self):
         return bytes(
@@ -265,12 +292,14 @@ class SectionHeader:
         return self.__str__()
 
 class ElfParser:
-    def __init__(self, bytes):
-        self.bytes = Steamer(bytes)
+    def __init__(self, raw_bytes):
+        self.raw_bytes = raw_bytes + b''
+        self.bytes = Steamer(raw_bytes)
         self.file_header = FileHeader(self.bytes)
         self.sections = []
         self.program_header = []
 
+        self.is_modified = False
         self._load_sections()
         self._load_program_header()
 
@@ -322,26 +351,33 @@ class ElfParser:
     
     def __bytes__(self):
         sorted_sections =  sorted(self.sections, key=lambda x: x.sh_offset.numeric_value )
-        sorted_program_headers =  sorted(self.program_header, key=lambda x: x.p_offset.numeric_value )
+        sorted_program_headers = self.program_header #sorted(self.program_header, key=lambda x: x.p_offset.numeric_value )
         output = bytes()
         # file header
         output += bytes(self.file_header)
         # program headers
         for i in sorted_program_headers:
-            print(i.p_offset.numeric_value)
             output += bytes(i)
-
+            assert self.is_modified or self.raw_bytes[:len(output)].hex() == output.hex()
         delta_sections = 0
         use_align = True
         # SECTION DATA
+        current_offset = len(output)
         for index, i in enumerate(sorted_sections):
+            need_to_align = 0
             if index > 1 and use_align:
                 need_to_align = i.sh_offset.numeric_value - delta_sections
                 if need_to_align > 0:
-                    output += b"\x00" * need_to_align                
-            # add the output data and new assignment location
+                    output += b"\x00" * need_to_align        
+                elif need_to_align < 0:
+                    # wtf ? I don't think this is how to do it ??? 
+                    output = output[:need_to_align]        
+
             output += i.data
-            delta_sections = i.sh_offset.numeric_value + i.sh_size.numeric_value
+            delta_sections = len(output)            
+            assert self.is_modified or self.raw_bytes[current_offset:len(output)].hex() == output[current_offset:].hex(), f"Failed at index {index} ({i.name})"
+            current_offset = len(output)
+
         # Need to align ? Maybe ? 
         if use_align:
             delta = self.file_header.shoff.numeric_value - len(output)
@@ -353,6 +389,8 @@ class ElfParser:
         
 
     def _modify_text_sections(self, sorted_sections, new_bytes):
+        # Turn offs additional validation when converting back to bytes
+        self.is_modified  =True
         delta_sections = 0
         size = 0
         for _, i in enumerate(sorted_sections):

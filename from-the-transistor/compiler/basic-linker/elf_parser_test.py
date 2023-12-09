@@ -7,15 +7,15 @@ def test_should_be_able_to_read_and_write(bytes_raw):
     reconstructed = bytes(elf).hex()
     truth = bytes_raw.hex()
     print(reconstructed)
-    print(truth)
-
-    assert reconstructed == truth, f"{len(bytes(elf))} vs {len(bytes_raw)}"
+  #  print(truth)
+    assert len(bytes(elf)) == len(bytes_raw), "Mismatch in size"
+    assert reconstructed == truth, f"Mismatch between the reconstructed value"
 
 def run_test_first():
     for test_file in [
         "bins/main.o",
         "bins/testPrint.o",
-#        "bins/runnable",
+        "bins/runnable",
     ]:
         with open(test_file, "rb") as file:
             test_should_be_able_to_read_and_write(file.read())
@@ -43,7 +43,8 @@ if __name__ == "__main__":
     print(dissemble_text_section(assemble_text(b'INC ecx; DEC edx')))
     
 
-    with open("bins/main.o", "rb") as file:
+#    with open("bins/main.o", "rb") as file:
+    with open("bins/runnable", "rb") as file:
         bytes_raw = file.read()
         elf = ElfParser(bytes_raw)
         # If I modify a header, then I need to adjust all the headers that is within this scope ? Right ? 
