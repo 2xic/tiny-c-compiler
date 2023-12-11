@@ -1,4 +1,5 @@
 The compiler is starting to take shape, let's think some about the linker
+
 - https://hzliu123.github.io/linux-kernel/Using%20GNU%20Compiler%20and%20Binutils%20by%20Example.pdf
 - https://stackoverflow.com/a/30507725
   - Linkers work like the solc linker -> Use placeholder and fill them in later
@@ -12,13 +13,10 @@ The compiler is starting to take shape, let's think some about the linker
 
 So in the assembly file they just mark it as a `@PLT` section
 - https://reverseengineering.stackexchange.com/questions/1992/what-is-plt-got
-- 
 
 ### Job of the linker
 - Re-allocate the .data and .text sections
 - Resolve unresolved symbols
-- 
-- 
 
 ## Elf
 - https://nutcrackerssecurity.github.io/posts/elf-binary/
@@ -28,3 +26,12 @@ So in the assembly file they just mark it as a `@PLT` section
 readelf -l ./elf_file
 ```
 
+### [Implement an ELF linker](https://gist.github.com/joydo/037f15e78f6e4118e92c9e2e278041a6)
+- From someone who worked on lld !
+- Combine .text section
+- Combine .data section
+- Resolve synbols
+
+
+### [A New ELF Linker](https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/34417.pdf)
+- Someone from Google wrote this

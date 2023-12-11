@@ -18,7 +18,44 @@ int main(){
 - https://www.wilfred.me.uk/blog/2014/08/27/baby-steps-to-a-c-compiler/
 
 ## Optimizations
-- Remove unreadable code
+- Remove unreachable code
+- Constant folding
+
+## C-Pointers
+Pointers are just point 2 memory regions ... Looking at the assembly output for my `memory_pointers.c`
+
+Here is the output assembly of a simple assignment/re-assignment of a pointer value
+```
+   3:memory_pointers.c ****     int a = 4;
+  23                            .loc 1 3 9
+  24 001b C745EC04              movl    $4, -20(%rbp)
+  24      000000
+   4:memory_pointers.c **** 
+   5:memory_pointers.c ****     int *p = &a;
+  25                            .loc 1 5 10
+  26 0022 488D45EC              leaq    -20(%rbp), %rax
+  27 0026 488945F0              movq    %rax, -16(%rbp)
+   6:memory_pointers.c **** 
+   7:memory_pointers.c ****     *p = 8;
+  28                            .loc 1 7 8
+  29 002a 488B45F0              movq    -16(%rbp), %rax
+  30 002e C7000800              movl    $8, (%rax)
+  30      0000
+   8:memory_pointers.c **** 
+   9:memory_pointers.c ****     return a;
+  31                            .loc 1 9 12
+  32 0034 8B45EC                movl    -20(%rbp), %eax
+  10:memory_pointers.c **** }
+  33                            .loc 1 10 1
+```
+
+Resources
+- https://stackoverflow.com/questions/25222356/how-references-in-c-are-implemented-with-pointers 
+- https://cs2461-2020.github.io/lectures/pointers.pdf
+  - Pointers can just point to the address of the stack :) 
+  - We switch away from using the `.data` section and move to using the stack
+  - Then most of our issues should be solved.
+
 
 ## Asm
 - https://www.cs.mcgill.ca/~cs573/fall2004/classnotes/Assem_Linux.pdf

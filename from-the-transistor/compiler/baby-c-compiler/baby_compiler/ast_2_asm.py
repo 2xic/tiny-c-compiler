@@ -7,6 +7,7 @@ from .ast import File, FunctionDefinition, ReturnDefinition, FunctionBody, Varia
 class AsmOutputStream:
     def __init__(self, name) -> None:
         self.name = name
+        self.debug = True
         self.is_main = name == "main"
         self.output_stream = [
             """
@@ -19,11 +20,38 @@ f"""
 {name}: 
     movl $0, %eax
 """]
+        self.variables_stack_location = {}
+        self.stack_location_offset = 1
+        # We will never pop it off the stack, 
+    
+    def get_or_set_stack_location(self, name, value):
+        assert len(name.split(" ")) == 1
+        if not name in self.variables_stack_location:
+            self.variables_stack_location[name] = (len(self.variables_stack_location) + 1)
+            self.stack_location_offset += 1        
+        # Size of the stack - location of the variable is where we should read :) 
+        location = self.variables_stack_location[name]
+        # Memory reference
+        if value is None:
+            #return {8 * (index + 1)}(%rsp)
+            #output.append(f"\taddl {8 * (index + 1)}(%rsp), %eax")
+            return f"{location}(%rsp)"
+        else:
+            return f"pushq ${value}"
+        
+    def get_stack_offset(self, name, delta):
+        location = self.variables_stack_location[name] # delta
+        return f"{location}(%rsp)"
+    
+    def append(self, text, comment="No comment"):
+        print(self.variables_stack_location)
+        print(self.stack_location_offset)
+        if self.debug:
+            self.output_stream.append(text + " # " + comment)
+        else:
+            self.output_stream.append(text)
 
-    def append(self, text):
-        self.output_stream.append(text)
-
-def create_sys_exit(exit_code):
+def create_sys_exit(exit_code, output: AsmOutputStream):
     if isinstance(exit_code, NumericValue):
         return f"""
     movl    ${exit_code.value}, %ebx
@@ -31,8 +59,9 @@ def create_sys_exit(exit_code):
     int     $0x80
         """
     elif isinstance(exit_code, VariableReference):
+        stack_location = output.get_or_set_stack_location(exit_code.variable, None)
         return f"""
-    movl    {exit_code.variable}, %ebx
+    movl    {stack_location}, %ebx
     movl    $1, %eax
     int     $0x80
         """
@@ -117,28 +146,45 @@ class Ast2Asm:
         elif isinstance(node, VariableDeclaration):
             # TODO: Doing this just because it is easier to deal with
             # Likely we should do some stack allocations etc depending on context 
-            self.data_sections.append(
-                f"\t{node.name}: .long 0"
+            #self.data_sections.append(
+            #    f"\t{node.name}: .long 0"
+            #)
+            print(":)")
+            output.append(
+                "\t"+ output.get_or_set_stack_location(node.name, 0),
+                comment=f"Referencing {node.name} assigned"
             )
+            stack = output.get_or_set_stack_location(node.name, None)
+
             if not node.value is None:
                 # Else the node has to write the data to %eax at some point during the evaluation
                 if isinstance(node.value, NumericValue):
                     output.append(
-                        f"\tmovl ${node.value.value}, {node.name}"
+                        f"\tmovl ${node.value.value}, {stack}",
+                        comment=f"Referencing {node.name} assigned"
                     )
+
                 elif isinstance(node.value, VariableReference):
                     # swappy memory yes yes yes 
+                    stack = output.get_stack_offset(node.value.variable, 2) 
+                    print(stack)
                     output.append(
-                        f"\tmovl {node.value.variable}, %eax"
+                        f"\tmovl {stack}, %eax"
                     )
+                    next_variable = output.get_or_set_stack_location(node.name, None)
                     output.append(
-                        f"\tmovl %eax, {node.name}"
+                        f"\tmovl %eax, {next_variable}",
+                        comment=f"Referencing {node.name} assigned"
                     )
                 else:
-                    self.convert_nodes(node.value, output) 
+                    # start with 0
+                    self.convert_nodes(node.value, output)
                     output.append(
-                        f"\tmovl %eax, {node.name}"
+                        f"\tmovl %eax, {stack}",
+                        comment=f"Referencing {node.name} assigned from a underlying node"
                     )
+
+                
         elif isinstance(node, FunctionBody):
             for i in node.child_nodes:
                 self.convert_nodes(i, output)
@@ -151,9 +197,9 @@ class Ast2Asm:
                     # Unwrap it ... push add push add ..
                     # We will store the results into memory ...
                     self.convert_nodes(node.value, output)
-                    output.append(create_sys_exit("eax"))
+                    output.append(create_sys_exit("eax", output))
                 else:
-                    output.append(create_sys_exit(node.value))
+                    output.append(create_sys_exit(node.value, output))
             else:
                 if isinstance(node.value, NumericValue):
                     # We return a static value ? 
@@ -182,13 +228,15 @@ class Ast2Asm:
             print("node, === ", node)
             # do the math
             if isinstance(node.value, NumericValue):
+                reference_stack = output.get_or_set_stack_location(node.v_reference, None)
                 output.append(
-                    f"\tmovl ${node.value.value}, {node.v_reference}"
+                    f"\tmovl ${node.value.value}, {reference_stack}"
                 )
             else:
                 self.convert_nodes(node.value, output)
+                reference_stack = output.get_or_set_stack_location(node.v_reference, None)
                 output.append(
-                    f"\tmovl %eax, {node.v_reference}"
+                    f"\tmovl %eax, {reference_stack}"
                 )
         elif isinstance(node, FunctionCall):
                if node.function_name in self.built_in_functions:
@@ -200,7 +248,7 @@ class Ast2Asm:
                else:
                     for i in node.parameters.child_nodes:
                         if isinstance(i, NumericValue):
-                            output.append(f"\tpush ${i.value}")
+                            output.append(f"\tpush ${i.value}", comment="call")
                         elif isinstance(i, StringValue):
                             print("WRITE STRINGS To RO SECTION!")
                         else:
@@ -237,10 +285,13 @@ class Ast2Asm:
             self.convert_nodes(node.body, output)
         elif isinstance(node, Equal):
             # I want to simple resolve here, variable reference are hard to think about ... 
-            a: VariableReference = node.a 
+            #a: VariableReference = node.a 
+            reference_stack = output.get_or_set_stack_location(node.a.variable, None)
+
             b: NumericValue = node.b
             output.append(
-                f"\tcmpl ${b.value}, {a.variable}"
+                f"\tcmpl ${b.value}, {reference_stack}",
+                comment=f"Comparing against {node.a.variable}"
             )
         elif isinstance(node, WhileConditional):
             # Need to check this and then jump ...
@@ -273,7 +324,9 @@ class Ast2Asm:
                     found_match = True
                     break
             if not found_match:
-                output.append(f"\taddl {node.variable}, %eax")
+                reference_stack = output.get_or_set_stack_location(node.variable, None)
+                output.append(f"\taddl {reference_stack}, %eax")
+
         else:
             raise Exception(f"Unknown math op node ({node})")
         
@@ -281,7 +334,7 @@ class Ast2Asm:
         output.append("\tmovl %eax, %ebx") # copy over the value
         self.convert_nodes(node, output)
         output.append(
-            f"\taddl %ebx, %eax"
+            f"\taddl %ebx, %eax",
         )
 
 
@@ -307,7 +360,7 @@ class SyswriteMapping:
             f"\t{message_id}:  .ascii  \"{string_value}\""
         )
         output.append(
-            "\tmov     $1, %rax",
+            "\tmov     $1, %eax",
         )
         output.append(
             "\tmov     $1, %rdi",

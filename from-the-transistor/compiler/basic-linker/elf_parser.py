@@ -21,6 +21,14 @@ class BytesValue:
         encoded = (value).to_bytes( bytes_size, byteorder='little') 
 #        padding = b"\x00" * (bytes_size - len(encoded))
         return BytesValue( encoded  )
+    
+    def set_value(self, value):
+        if type(value) == bytes:
+            assert len(value) == len(self.value)
+            return BytesValue(value)
+        else:
+            return BytesValue.from_numeric(value, len(self.value))
+
 
 class Steamer:
     def __init__(self, bytes) -> None:
@@ -46,11 +54,21 @@ class Steamer:
         return [
             a for _ in range(entries)
         ]
+
+# Fake streamer to simplify the life of constructing an ELF binary
+class StreamerWrite:
+    def __init__(self) -> None:
+        pass
+
+    def read(self, size):
+        return BytesValue(b"\x00" * size)
+
     
 class FileHeader:
     def __init__(self, streamer: Steamer) -> None:
         self.magic_bytes = streamer.read(4)
-        assert self.magic_bytes.value == b"\x7fELF", self.magic_bytes
+        if isinstance(streamer, Steamer):
+            assert self.magic_bytes.value == b"\x7fELF", self.magic_bytes
         self.is_64_bit_bytes = streamer.read(1)
         # numeric debug
         self.is_64_bit = self.is_64_bit_bytes.numeric_value == 2
@@ -60,14 +78,15 @@ class FileHeader:
         self.big_endianness = self.big_endianness_bytes.numeric_value == 2
         
         self.version = streamer.read(1) 
-        self.os = streamer.read(1) # this is a lookup lsit
+        self.os = streamer.read(1) # this is a lookup list
         self.abi_version = streamer.read(1)
         self.padding = streamer.read(7)
         self.object_type = streamer.read(2) 
         self.machine = streamer.read(2)
         self.elf_version = streamer.read(4)
 
-        assert streamer.index in [0x18], streamer.index # before the split
+        if isinstance(streamer, Steamer):
+            assert streamer.index in [0x18], streamer.index # before the split
 
         self.entry = streamer.conditional_read(
             is_64_bit=self.is_64_bit,
@@ -91,7 +110,9 @@ class FileHeader:
         self.shentsize = streamer.read(2)
         self.shnum = streamer.read(2) # shnum
         self.shstrndx = streamer.read(2)
-        assert streamer.index in [0x34, 0x40], bytes.index # 32 bit or 64 bit
+
+        if isinstance(streamer, Steamer):
+            assert streamer.index in [0x34, 0x40], bytes.index # 32 bit or 64 bit
 
         expected_size = 0x40 if self.is_64_bit else 0x34
         assert bytes(self).hex() == streamer.bytes[streamer.index-expected_size:streamer.index].hex()
@@ -141,6 +162,21 @@ class FileHeader:
         )
        # assert len(output) in [0x34, 0x40], len(output)
         return output
+
+    @staticmethod
+    def create():
+        file_header = FileHeader(StreamerWrite())
+        file_header.magic_bytes = file_header.magic_bytes.set_value("b\x7fELF")
+        file_header.is_64_bit_bytes = file_header.is_64_bit_bytes.set_value("\x02")
+        file_header.big_endianness_bytes = file_header.is_64_bit_bytes.set_value("\x01")
+        file_header.elf_version.bytes = file_header.is_64_bit_bytes.set_value("\x01")
+        file_header.abi_version.bytes = file_header.is_64_bit_bytes.set_value("\x00")
+        file_header.object_type.bytes = file_header.is_64_bit_bytes.set_value("\x02")
+        file_header.machine.bytes = file_header.is_64_bit_bytes.set_value("\x3e\x00")
+        # entry point ?
+        file_header.phoff.bytes =  file_header.is_64_bit_bytes.set_value("\x40\x00\x00\x00")
+        return file_header
+
 class ProgramHeader:
     def __init__(self, is_64_bit, streamer: Steamer) -> None:
         # Notes from https://en.wikipedia.org/wiki/Executable_and_Linkable_Format#Program_header
@@ -205,7 +241,7 @@ class ProgramHeader:
             0x70000000: "PT_LOPROC",
             0x7FFFFFFF: "PT_HIPROC",
         }
-        type = program_header_type[self.p_type.numeric_value]
+        type = program_header_type.get(self.p_type.numeric_value, None)
         return f"Program header {type} "
 
     def __bytes__(self):
@@ -220,6 +256,20 @@ class ProgramHeader:
             self.p_flags_32.bytes +\
             self.p_align.bytes
         )
+
+    @staticmethod
+    def create():
+        file_header = ProgramHeader(StreamerWrite())
+        file_header.p_type = file_header.p_type.set_value(b"\x01\x00\x00\x00")
+        file_header.p_flags_64 = file_header.p_flags_64.set_value(b"\x05\x00\x00\x00")
+        # offset = 0
+        file_header.p_vaddr = file_header.p_flags_64.set_value(b"\x00\x00\x40\x00\x00\x00\x00\x00")
+        file_header.p_paddr = file_header.p_flags_64.set_value(b"\x00\x00\x40\x00\x00\x00\x00\x00")
+        file_header.p_filesz = file_header.p_flags_64.set_value(b"\xB0\x00\x00\x00\x00\x00\x00\x00")
+        file_header.p_memsz = file_header.p_flags_64.set_value(b"\xB0\x00\x00\x00\x00\x00\x00\x00")
+        file_header.p_align = file_header.p_flags_64.set_value(b"\x00\x00\20\x00\x00\x00\x00\x00")
+                
+        return file_header
 
 class SectionHeader:
     def __init__(self, is_64_bit, streamer: Steamer) -> None:
@@ -346,6 +396,7 @@ class ElfParser:
         sorted_sections =  sorted(self.sections, key=lambda x: x.sh_offset.numeric_value )
 
         self._modify_text_sections(sorted_sections, new_bytes)
+        self._modify_program_sections()
 
         return self.__bytes__()
     
@@ -357,6 +408,7 @@ class ElfParser:
         output += bytes(self.file_header)
         # program headers
         for i in sorted_program_headers:
+            print(i)
             output += bytes(i)
             assert self.is_modified or self.raw_bytes[:len(output)].hex() == output.hex()
         delta_sections = 0
@@ -396,9 +448,15 @@ class ElfParser:
         for _, i in enumerate(sorted_sections):
             if i.name.decode('utf-8') == ".text":
                 delta = len(new_bytes) - len(i.data)
+                print("Modified at offsets -> ", i.sh_offset.numeric_value, i.sh_offset.numeric_value + i.sh_size.numeric_value)
                 i.sh_size = BytesValue.from_numeric(len(new_bytes), len(i.sh_size.value))
                 i.data = new_bytes
                 delta_sections += delta
+                self.modify_sections_at_index = (
+                    i.sh_offset.numeric_value,
+                     i.sh_offset.numeric_value + i.sh_size.numeric_value,
+                    delta    
+                )
             else:
                 current_offset = i.sh_offset
                 i.sh_offset = BytesValue.from_numeric(delta_sections + current_offset.numeric_value, len(current_offset.bytes))
@@ -407,4 +465,11 @@ class ElfParser:
             size += i.sh_size.numeric_value
         return size
         
-
+    def _modify_program_sections(self):
+        for i in self.program_header:
+            #print((i.p_offset.numeric_value, i.p_offset.numeric_value + i.p_size.numeric_value))
+            (start, old_size, delta) = self.modify_sections_at_index
+            if i.p_offset.numeric_value <= start:
+                i.p_filesz = BytesValue.from_numeric(i.p_filesz.numeric_value - delta, len(i.p_filesz.value))
+                print("Moved one section ", i)
+ 

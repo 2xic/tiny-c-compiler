@@ -6,7 +6,7 @@ def test_should_be_able_to_read_and_write(bytes_raw):
     elf = ElfParser(bytes_raw)
     reconstructed = bytes(elf).hex()
     truth = bytes_raw.hex()
-    print(reconstructed)
+#    print(reconstructed)
   #  print(truth)
     assert len(bytes(elf)) == len(bytes_raw), "Mismatch in size"
     assert reconstructed == truth, f"Mismatch between the reconstructed value"
@@ -54,9 +54,9 @@ if __name__ == "__main__":
         new_elf = elf.modify_text_section(
             assemble_text(b'INC ecx; DEC edx')
         )
-        print(new_elf.hex())
-        print("=" * 32)
-        print("Real output")
-        print(bytes_raw.hex())
+#        print(new_elf.hex())
+#        print("=" * 32)
+#        print("Real output")
+ #       print(bytes_raw.hex())
         with open("./bins/new_elf.o", "wb") as file:
             file.write(new_elf)
