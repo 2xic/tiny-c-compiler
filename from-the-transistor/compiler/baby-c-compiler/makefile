@@ -20,8 +20,8 @@ run_baby_compiler:
 	./yourprogram.o || (echo "Returned with == $$?"; exit 0)
 
 run_baby_compiler_tests:
+	./assert.sh ./reference/while_loops.c "10" ""
 	./assert.sh ./reference/function_if_statments_with_if_branch.c "0" "yes"
-	# debug 
 	./assert.sh ./reference/simple.c "11"
 	./assert.sh ./reference/multiple_functions.c "5"
 	./assert.sh ./reference/multiple_sum.c "14"
@@ -34,12 +34,13 @@ run_baby_compiler_tests:
 	./assert.sh ./reference/function_if_statments_with_else_branch.c "3" "No"
 	./assert.sh ./reference/function_multiple_if_change_return_code.c "14" ""
 	./assert.sh ./reference/simple_increment.c "2" ""
-	./assert.sh ./reference/while_loops.c "10" ""
 	./assert.sh ./reference/while_loops_without_else.c "10" ""
+	./assert.sh ./reference/indirect_assigment.c "2" ""
+	./assert.sh ./reference/variable_assigments.c "2" ""
 	./assert.sh ./reference/function_calls_over_all.c "32"
 	./assert.sh ./reference/function_assigment.c "9"
-	# TODO: This is failing - 
-	./assert.sh ./reference/variable_assigments.c "2" ""
+	./assert.sh ./reference/global_variables.c "2"
+
 	exit 0
 
 tests: run_baby_compiler_tests 

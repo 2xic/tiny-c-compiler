@@ -21,33 +21,43 @@ f"""
     movl $0, %eax
 """]
         self.variables_stack_location = {}
-        self.stack_location_offset = 1
+        self.stack_location_offset = 0
         # We will never pop it off the stack, 
     
     def get_or_set_stack_location(self, name, value):
         assert len(name.split(" ")) == 1
         if not name in self.variables_stack_location:
             self.variables_stack_location[name] = (len(self.variables_stack_location) + 1)
-            self.stack_location_offset += 1        
+            self.stack_location_offset += 1     
         # Size of the stack - location of the variable is where we should read :) 
-        location = self.variables_stack_location[name]
+        # Depending on the size of the stack is how far we need to look back!
+        location = self.get_variable_offset(name)
         # Memory reference
         if value is None:
-            #return {8 * (index + 1)}(%rsp)
-            #output.append(f"\taddl {8 * (index + 1)}(%rsp), %eax")
+          #  print("aaaaa", f"{location}(%rsp)")
             return f"{location}(%rsp)"
         else:
             return f"pushq ${value}"
         
-    def get_stack_offset(self, name, delta):
-        location = self.variables_stack_location[name] # delta
+    def get_stack_offset(self, name):
+        location = self.get_variable_offset(name)
+        print("bbbb", f"{location}(%rsp)", self.variables_stack_location)
         return f"{location}(%rsp)"
     
-    def append(self, text, comment="No comment"):
-        print(self.variables_stack_location)
-        print(self.stack_location_offset)
+    def get_variable_offset(self, name):
+        delta = (self.stack_location_offset - self.variables_stack_location[name])
+        print((self.stack_location_offset, self.variables_stack_location[name], delta))
+        location = delta  * 8
+        return location
+
+    def append(self, text, comment=None):
+#        print(self.variables_stack_location)
+#        print(self.stack_location_offset)
         if self.debug:
-            self.output_stream.append(text + " # " + comment)
+            if comment is None:
+                self.output_stream.append(text)
+            else:
+                self.output_stream.append(text + " # " + comment)
         else:
             self.output_stream.append(text)
 
@@ -150,26 +160,34 @@ class Ast2Asm:
             #    f"\t{node.name}: .long 0"
             #)
             print(":)")
-            output.append(
-                "\t"+ output.get_or_set_stack_location(node.name, 0),
-                comment=f"Referencing {node.name} assigned"
-            )
-            stack = output.get_or_set_stack_location(node.name, None)
 
             if not node.value is None:
                 # Else the node has to write the data to %eax at some point during the evaluation
                 if isinstance(node.value, NumericValue):
+                    #output.append(
+                    #    f"\tmovl ${node.value.value}, {stack}",
+                    #    comment=f"Referencing {node.name} assigned"
+                    #)
+                    #output.append(
+                    #     output.get_stack_offset(stack, node.value.value) 
+                    #)
                     output.append(
-                        f"\tmovl ${node.value.value}, {stack}",
+                        "\t"+ output.get_or_set_stack_location(node.name, node.value.value),
                         comment=f"Referencing {node.name} assigned"
                     )
-
                 elif isinstance(node.value, VariableReference):
-                    # swappy memory yes yes yes 
-                    stack = output.get_stack_offset(node.value.variable, 2) 
-                    print(stack)
                     output.append(
-                        f"\tmovl {stack}, %eax"
+                        "\t"+ output.get_or_set_stack_location(node.name, 0),
+                        comment=f"Referencing {node.name} assigned"
+                    )
+                    #stack = output.get_or_set_stack_location(node.name, None)
+
+                    # swappy memory yes yes yes 
+                    stack = output.get_stack_offset(node.value.variable) 
+                    #print(stack)
+                    output.append(
+                        f"\tmovl {stack}, %eax",
+                        comment=f"Copying item from variable {node.value.variable}"
                     )
                     next_variable = output.get_or_set_stack_location(node.name, None)
                     output.append(
@@ -177,14 +195,25 @@ class Ast2Asm:
                         comment=f"Referencing {node.name} assigned"
                     )
                 else:
+                    output.append(
+                        "\t"+ output.get_or_set_stack_location(node.name, 0),
+                        comment=f"Referencing {node.name} assigned"
+                    )
+                    stack = output.get_stack_offset(node.name) 
+
                     # start with 0
                     self.convert_nodes(node.value, output)
                     output.append(
                         f"\tmovl %eax, {stack}",
                         comment=f"Referencing {node.name} assigned from a underlying node"
                     )
+            else:
+                # still need to push a empty item to the stack to allocate it 
+                output.append(
+                    "\t"+ output.get_or_set_stack_location(node.name, 0),
+                    comment=f"{node.name} allocated"
+                )
 
-                
         elif isinstance(node, FunctionBody):
             for i in node.child_nodes:
                 self.convert_nodes(i, output)
