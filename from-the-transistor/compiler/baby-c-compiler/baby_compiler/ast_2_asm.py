@@ -61,28 +61,6 @@ f"""
         else:
             self.output_stream.append(text)
 
-def create_sys_exit(exit_code, output: AsmOutputStream):
-    if isinstance(exit_code, NumericValue):
-        return f"""
-    movl    ${exit_code.value}, %ebx
-    movl    $1, %eax
-    int     $0x80
-        """
-    elif isinstance(exit_code, VariableReference):
-        stack_location = output.get_or_set_stack_location(exit_code.variable, None)
-        return f"""
-    movl    {stack_location}, %ebx
-    movl    $1, %eax
-    int     $0x80
-        """
-    else:
-        # Hm - not ideal way to implement this but works
-        return f"""
-    movl    {exit_code}, %ebx
-    movl    $1, %eax
-    int     $0x80
-        """
-
 
 class Ast2Asm:
     def __init__(self, ast: File) -> None:
@@ -103,6 +81,7 @@ class Ast2Asm:
         self.built_in_functions = {
             "write":SyswriteMapping()
         }
+        self.global_variables = {}
         self.message_counter = 2
 
 
@@ -120,99 +99,89 @@ class Ast2Asm:
         )
         self.convert_nodes(self.ast.functions["main"], main_function_output)
         other_functions = []
+        global_variables = []
+        for i in self.ast.global_variables:
+            function_code = AsmOutputStream(
+                name=i
+            )
+            function_code.output_stream = []
+            self.convert_nodes(self.ast.global_variables[i], function_code)
+            # Insert after the init code
+            main_function_output.output_stream = [main_function_output.output_stream[0], ] + function_code.output_stream + main_function_output.output_stream[1:]
+
+
         for i in self.ast.functions:
             if i != "main":
                 function_code = AsmOutputStream(
                     name=i
                 )
                 self.convert_nodes(self.ast.functions[i], function_code)
-                print(self.ast.functions[i], function_code.output_stream)
                 other_functions += function_code.output_stream
 
-
         # Need to insert one new lien at the end else the compiler is mad
-        combined = main_function_output.output_stream + other_functions + self.data_sections
+        combined = global_variables + main_function_output.output_stream + other_functions + self.data_sections
         return "\n".join(list(filter(lambda x: len(x.strip()) > 0, "\n".join(combined).split("\n")))) + "\n"
 
     def convert_nodes(self, node, output: AsmOutputStream):
         if isinstance(node, File):
             return self.convert_nodes(node, output)
         elif isinstance(node, FunctionDefinition):
-            if not output.is_main:
-                pass
-             #   output.append("\tpushq   %rbp")
-                #for argument in node.parameters.child_nodes:
-                # we need to pop this off the stack at once ?
-                # Well I can do a pop, but I don't want that 
-                # I want to keep the values on the tack until we do the ret ..
-                 #   pass
-                 #   output.append("\tpushq $4")
-                #if len(node.parameters.child_nodes):
-                #    output.append("\tmovl 8(%rsp), %eax")
             self.current_function = node
             self.convert_nodes(node.body, output)
 
 
-        elif isinstance(node, VariableDeclaration):
-            # TODO: Doing this just because it is easier to deal with
-            # Likely we should do some stack allocations etc depending on context 
-            #self.data_sections.append(
-            #    f"\t{node.name}: .long 0"
-            #)
-            print(":)")
-
-            if not node.value is None:
-                # Else the node has to write the data to %eax at some point during the evaluation
+        elif isinstance(node, VariableDeclaration):            
+            if node.parent is None:
+                self.data_sections.append(
+                    f"\t{node.name}: .long 0"
+                )
+                print(node.value)
                 if isinstance(node.value, NumericValue):
-                    #output.append(
-                    #    f"\tmovl ${node.value.value}, {stack}",
-                    #    comment=f"Referencing {node.name} assigned"
-                    #)
-                    #output.append(
-                    #     output.get_stack_offset(stack, node.value.value) 
-                    #)
                     output.append(
-                        "\t"+ output.get_or_set_stack_location(node.name, node.value.value),
-                        comment=f"Referencing {node.name} assigned"
-                    )
-                elif isinstance(node.value, VariableReference):
-                    output.append(
-                        "\t"+ output.get_or_set_stack_location(node.name, 0),
-                        comment=f"Referencing {node.name} assigned"
-                    )
-                    #stack = output.get_or_set_stack_location(node.name, None)
-
-                    # swappy memory yes yes yes 
-                    stack = output.get_stack_offset(node.value.variable) 
-                    #print(stack)
-                    output.append(
-                        f"\tmovl {stack}, %eax",
-                        comment=f"Copying item from variable {node.value.variable}"
-                    )
-                    next_variable = output.get_or_set_stack_location(node.name, None)
-                    output.append(
-                        f"\tmovl %eax, {next_variable}",
-                        comment=f"Referencing {node.name} assigned"
+                        f"\tmovl ${node.value.value}, {node.name}"
                     )
                 else:
+                    raise Exception("Unsupported global variable value")
+            else:
+                if not node.value is None:
+                    # Else the node has to write the data to %eax at some point during the evaluation
+                    if isinstance(node.value, NumericValue):
+                        output.append(
+                            "\t"+ output.get_or_set_stack_location(node.name, node.value.value),
+                            comment=f"Referencing {node.name} assigned"
+                        )
+                    elif isinstance(node.value, VariableReference):
+                        output.append(
+                            "\t"+ output.get_or_set_stack_location(node.name, 0),
+                            comment=f"Referencing {node.name} assigned"
+                        )
+                        stack = output.get_stack_offset(node.value.variable) 
+                        output.append(
+                            f"\tmovl {stack}, %eax",
+                            comment=f"Copying item from variable {node.value.variable}"
+                        )
+                        next_variable = output.get_or_set_stack_location(node.name, None)
+                        output.append(
+                            f"\tmovl %eax, {next_variable}",
+                            comment=f"Referencing {node.name} assigned"
+                        )
+                    else:
+                        output.append(
+                            "\t"+ output.get_or_set_stack_location(node.name, 0),
+                            comment=f"Referencing {node.name} assigned"
+                        )
+                        stack = output.get_stack_offset(node.name) 
+                        self.convert_nodes(node.value, output)
+                        output.append(
+                            f"\tmovl %eax, {stack}",
+                            comment=f"Referencing {node.name} assigned from a underlying node"
+                        )
+                else:
+                    # still need to push a empty item to the stack to allocate it 
                     output.append(
                         "\t"+ output.get_or_set_stack_location(node.name, 0),
-                        comment=f"Referencing {node.name} assigned"
+                        comment=f"{node.name} allocated"
                     )
-                    stack = output.get_stack_offset(node.name) 
-
-                    # start with 0
-                    self.convert_nodes(node.value, output)
-                    output.append(
-                        f"\tmovl %eax, {stack}",
-                        comment=f"Referencing {node.name} assigned from a underlying node"
-                    )
-            else:
-                # still need to push a empty item to the stack to allocate it 
-                output.append(
-                    "\t"+ output.get_or_set_stack_location(node.name, 0),
-                    comment=f"{node.name} allocated"
-                )
 
         elif isinstance(node, FunctionBody):
             for i in node.child_nodes:
@@ -226,9 +195,9 @@ class Ast2Asm:
                     # Unwrap it ... push add push add ..
                     # We will store the results into memory ...
                     self.convert_nodes(node.value, output)
-                    output.append(create_sys_exit("eax", output))
+                    output.append(self.create_sys_exit("eax", output))
                 else:
-                    output.append(create_sys_exit(node.value, output))
+                    output.append(self.create_sys_exit(node.value, output))
             else:
                 if isinstance(node.value, NumericValue):
                     # We return a static value ? 
@@ -366,6 +335,35 @@ class Ast2Asm:
             f"\taddl %ebx, %eax",
         )
 
+
+    def create_sys_exit(self, exit_code, output: AsmOutputStream):
+        if isinstance(exit_code, NumericValue):
+            return f"""
+        movl    ${exit_code.value}, %ebx
+        movl    $1, %eax
+        int     $0x80
+            """
+        elif isinstance(exit_code, VariableReference):
+            if exit_code.variable in self.ast.global_variables:
+                return f"""
+                    movl    {exit_code.variable}, %ebx
+                    movl    $1, %eax
+                    int     $0x80
+                """
+            else:
+                stack_location = output.get_or_set_stack_location(exit_code.variable, None)
+                return f"""
+            movl    {stack_location}, %ebx
+            movl    $1, %eax
+            int     $0x80
+                """
+        else:
+            # Hm - not ideal way to implement this but works
+            return f"""
+        movl    {exit_code}, %ebx
+        movl    $1, %eax
+        int     $0x80
+            """
 
 class SyswriteMapping:
     def __init__(self) -> None:

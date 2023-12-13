@@ -20,6 +20,7 @@ run_baby_compiler:
 	./yourprogram.o || (echo "Returned with == $$?"; exit 0)
 
 run_baby_compiler_tests:
+	./assert.sh ./reference/global_variables.c "2"
 	./assert.sh ./reference/while_loops.c "10" ""
 	./assert.sh ./reference/function_if_statments_with_if_branch.c "0" "yes"
 	./assert.sh ./reference/simple.c "11"
@@ -39,7 +40,6 @@ run_baby_compiler_tests:
 	./assert.sh ./reference/variable_assigments.c "2" ""
 	./assert.sh ./reference/function_calls_over_all.c "32"
 	./assert.sh ./reference/function_assigment.c "9"
-	./assert.sh ./reference/global_variables.c "2"
 
 	exit 0
 

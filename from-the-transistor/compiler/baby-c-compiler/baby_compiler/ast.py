@@ -153,6 +153,8 @@ class TokenConsumer:
         self.index = 0
 
     def get_token(self):
+        if self.index > len(self.tokens):
+            return None
         token = self.tokens[self.index]
         self.index += 1
         return token
@@ -176,6 +178,7 @@ class File(Nodes):
         super().__init__()
         self.name = name
         self.functions = {}
+        self.global_variables = {}
 
 class VariableDeclaration(Nodes):
     def __init__(self, type, name, value) -> None:
@@ -323,17 +326,23 @@ class AST:
             file.child_nodes.append(file_nodes)
             if isinstance(file_nodes, FunctionDefinition):
                 file.functions[file_nodes.name] = assign_global_values.assign_scope(file_nodes)
+            elif isinstance(file_nodes, VariableDeclaration):
+                file.global_variables[file_nodes.name] = file_nodes
+
         assert self.tokens_index.index == len(self.tokens),  "Failed to parse source code..."
         return file
 
     def get_root_symbols(self):
         # grammar: [return type] [function name] [parameter start] .... [parameter end] [scope start]
         checkpoint = self.tokens_index.index
-        function_scope = self.get_function_definition()
-        # If nothing is found
-        if function_scope is None:
-            print("Failed at ", self.tokens_index.tokens[self.tokens_index.index:self.tokens_index.index+5])
-            self.tokens_index.index = checkpoint
+        for scopes in [self.get_function_definition, self.get_variable_declaration_or_assignment]:
+            function_scope = scopes()
+            # If nothing is found
+            if function_scope is None:
+                print("Failed at ", self.tokens_index.tokens[self.tokens_index.index:self.tokens_index.index+5])
+                self.tokens_index.index = checkpoint
+            else:
+                break
 
         if self.tokens_index == checkpoint:
             raise Exception("Failed to create AST :(")
