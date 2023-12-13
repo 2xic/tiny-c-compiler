@@ -55,7 +55,21 @@ Resources
   - Pointers can just point to the address of the stack :) 
   - We switch away from using the `.data` section and move to using the stack
   - Then most of our issues should be solved.
-
+- Doing the stack method is quite simple
+    -  We send the %rsp location into the stack
+- Now the real challenge I want to tackle when adding support for pointers is malloc
+  -  We do a `brk` syscall
+  -  https://www.cs.usfca.edu/~mmalensek/cs326/assignments/project-3.html
+  -  Just need to find a good way to find the end of the program segment
+     -  Could define a symbol at use that as the location
+     -  No, you can just call [brk](https://stackoverflow.com/a/44876873)
+     -  ```
+        mov   $12, %rax         
+        mov   $0, %rdi          
+        syscall               
+        mov %rax, %rbx # Rax now has the end of program segment
+        ```
+- 
 
 ## Asm
 - https://www.cs.mcgill.ca/~cs573/fall2004/classnotes/Assem_Linux.pdf
