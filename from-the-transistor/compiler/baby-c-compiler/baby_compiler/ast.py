@@ -184,6 +184,7 @@ class VariableDeclaration(Nodes):
     def __init__(self, type, name, value) -> None:
         super().__init__()
         self.type = type
+        self.is_pointer = "*" in str(self.type)#.name
         self.name = name
         self.value = value
         self.child_nodes = [value]
@@ -288,6 +289,18 @@ class Equal(Nodes):
         self.child_nodes = [
             a, b
         ]
+
+class VariableAddressReference(Nodes):
+    def __init__(self, variable) -> None:
+        super().__init__()
+        self.child_nodes = [variable]
+        self.variable = variable
+
+class VariableAddressDereference(Nodes):
+    def __init__(self, value: VariableReference) -> None:
+        super().__init__()
+        self.value = value
+        self.child_nodes = [value]
 
 class AssignGlobalValues:
     def __init__(self) -> None:
@@ -445,6 +458,9 @@ class AST:
     def get_variable_declaration_or_assignment(self):
         type_value = self.tokens_index.get_token()
         if type_value in self.types:
+            pointer = self.tokens_index.peek_token() == "*"
+            if pointer:
+                type_value += self.tokens_index.get_token()
             name = self.tokens_index.get_token()
             if name.isalnum():
                 if self.tokens_index.is_peek_token("="):
@@ -473,6 +489,16 @@ class AST:
                         type_value,
                         math_expression,
                     )
+        elif type_value == "*":
+            value = self.tokens_index.get_token()
+            if value in self.variables:
+                if self.tokens_index.is_peek_token("="):
+                    math_expression = self.get_math_expression()
+                    if self.tokens_index.get_token() == ";" and math_expression is not None:
+                        return VariableAssignment(
+                            VariableAddressDereference(VariableReference(value)),
+                            math_expression,                            
+                        )
         return None
     
     def get_return_definition(self):
@@ -509,8 +535,16 @@ class AST:
             return self.get_function_call()
         elif token in self.variables:
             return VariableReference(self.tokens_index.get_token())
+        elif token == "&":
+            # == Memory pointer
+            _ = self.tokens_index.get_token()
+            name = self.tokens_index.get_token()
+            if name in self.variables:
+                return VariableAddressReference(VariableReference(name))
+            else:
+                raise Exception("Unknown expression node {token}")
         else:
-            raise Exception("Unknown expression node {token}")
+            raise Exception(f"Unknown expression node {token}")
         
     def get_inline_function_call(self):
         value = self.get_function_call()        

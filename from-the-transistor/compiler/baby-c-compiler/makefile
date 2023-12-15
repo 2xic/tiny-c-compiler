@@ -20,6 +20,8 @@ run_baby_compiler:
 	./yourprogram.o || (echo "Returned with == $$?"; exit 0)
 
 run_baby_compiler_tests:
+	./assert.sh ./reference/memory_pointers.c "9"
+	./assert.sh ./reference/more_memory_pointer_tests.c "9"
 	./assert.sh ./reference/global_variables.c "2"
 	./assert.sh ./reference/while_loops.c "10" ""
 	./assert.sh ./reference/function_if_statments_with_if_branch.c "0" "yes"

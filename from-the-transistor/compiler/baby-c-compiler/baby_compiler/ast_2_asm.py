@@ -1,7 +1,7 @@
 """
 We got nice AST output, we need nice output :)
 """
-from .ast import File, FunctionDefinition, ReturnDefinition, FunctionBody, VariableDeclaration, NumericValue, MathOp, VariableAssignment, FunctionCall, VariableReference, StringValue, Conditionals, IfCondition, ElseCondition, Equal, WhileConditional
+from .ast import File, FunctionDefinition, ReturnDefinition, FunctionBody, VariableDeclaration, NumericValue, MathOp, VariableAssignment, FunctionCall, VariableReference, StringValue, Conditionals, IfCondition, ElseCondition, Equal, WhileConditional, VariableAddressReference, VariableAddressDereference
 
 
 class AsmOutputStream:
@@ -31,28 +31,28 @@ f"""
             self.stack_location_offset += 1     
         # Size of the stack - location of the variable is where we should read :) 
         # Depending on the size of the stack is how far we need to look back!
-        location = self.get_variable_offset(name)
         # Memory reference
         if value is None:
-          #  print("aaaaa", f"{location}(%rsp)")
-            return f"{location}(%rsp)"
-        else:
+            return self.get_stack_offset(name)
+        elif type(value) == int or  value.isnumeric():
             return f"pushq ${value}"
+        else:
+            return f"pushq {value}"
         
     def get_stack_offset(self, name):
         location = self.get_variable_offset(name)
-        print("bbbb", f"{location}(%rsp)", self.variables_stack_location)
         return f"{location}(%rsp)"
-    
+
+    def get_memory_offset(self, name):
+        #location = self.get_variable_offset(name)
+        return f"%rsp"
+
     def get_variable_offset(self, name):
         delta = (self.stack_location_offset - self.variables_stack_location[name])
-        print((self.stack_location_offset, self.variables_stack_location[name], delta))
         location = delta  * 8
         return location
 
     def append(self, text, comment=None):
-#        print(self.variables_stack_location)
-#        print(self.stack_location_offset)
         if self.debug:
             if comment is None:
                 self.output_stream.append(text)
@@ -128,8 +128,6 @@ class Ast2Asm:
         elif isinstance(node, FunctionDefinition):
             self.current_function = node
             self.convert_nodes(node.body, output)
-
-
         elif isinstance(node, VariableDeclaration):            
             if node.parent is None:
                 self.data_sections.append(
@@ -164,6 +162,14 @@ class Ast2Asm:
                         output.append(
                             f"\tmovl %eax, {next_variable}",
                             comment=f"Referencing {node.name} assigned"
+                        )
+                    elif isinstance(node.value, VariableAddressReference):
+                        #print(node.value.variable.variable)
+                        #print(output.variables_stack_location)
+                        location = output.get_memory_offset(node.value.variable.variable)
+                        output.append(
+                            "\t"+ output.get_or_set_stack_location(node.name, location),
+                            comment=f"({node.name}) Storing variable reference for {node.value.variable.variable} "
                         )
                     else:
                         output.append(
@@ -226,10 +232,37 @@ class Ast2Asm:
             print("node, === ", node)
             # do the math
             if isinstance(node.value, NumericValue):
-                reference_stack = output.get_or_set_stack_location(node.v_reference, None)
-                output.append(
-                    f"\tmovl ${node.value.value}, {reference_stack}"
-                )
+                if isinstance(node.v_reference, VariableAddressDereference):
+                    # Dereference = You move memory into memory ...
+                    #raise Exception("You derefence ? ")
+                    stack = output.get_variable_offset(node.v_reference.value.variable)
+                    # This is the location of the variable pointer
+                    output.append(
+                        f"\tmov %rsp, %rax",
+                        comment=f"Move the rsp "
+                    )
+                    output.append(
+                        f"\tadd ${stack}, %rax",
+                        comment=f"Reduce the rsp to correct offset"
+                    )
+                    # We now have the variable pointer in %rax
+                    output.append(
+                        f"\tmov (%rax), %rax",
+                        comment=f"Move the pointer value into rax "
+                    )
+                    #print(stack)
+                    #print(node.v_reference.value.variable)
+                    #assert stack == 8, stack
+                    output.append(
+                        f"\tmovq ${node.value.value}, (%rax)",
+                        comment=f"Assign to rsp offset"
+                    )
+                    pass
+                else:
+                    reference_stack = output.get_or_set_stack_location(node.v_reference, None)
+                    output.append(
+                        f"\tmovl ${node.value.value}, {reference_stack}"
+                    )
             else:
                 self.convert_nodes(node.value, output)
                 reference_stack = output.get_or_set_stack_location(node.v_reference, None)
