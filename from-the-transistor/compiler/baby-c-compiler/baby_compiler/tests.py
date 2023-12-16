@@ -9,7 +9,6 @@ from .ast_2_asm import Ast2Asm
 def source_code_test(source_code):
     id_hash = hashlib.sha256(source_code.encode()).hexdigest()[:8]
     tokenizer = Tokenizer(source_code)
-    print(tokenizer.tokens)
     assert Snapshot(f"{id_hash}_correct_tokenized", tokenizer.tokens).check()
 
     tree = AST(tokenizer.tokens)

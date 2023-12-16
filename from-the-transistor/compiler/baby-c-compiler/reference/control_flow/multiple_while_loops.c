@@ -1,0 +1,27 @@
+
+int main(){
+    int a;
+
+    a = 1;
+    
+    int b;
+
+    b = 0;
+
+    while (b == 0){
+        a = a + 1;
+
+        if (a == 10){
+           b = 2;
+        } else {
+            // nope!
+        }
+    }
+
+    while(b == 2){
+        b = 0;
+        a = 22;
+    }
+
+    return a;
+}

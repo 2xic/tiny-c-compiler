@@ -23,6 +23,7 @@ run_baby_compiler_tests:
 	# control_flow
 	./assert.sh ./reference/control_flow/while_loops_without_else.c "10" ""
 	./assert.sh ./reference/control_flow/while_loops.c "10" ""
+	./assert.sh ./reference/control_flow/multiple_while_loops.c "22" ""
 
 	# function_calls
 	./assert.sh ./reference/function_calls/function_assigment.c "9"
@@ -50,7 +51,7 @@ run_baby_compiler_tests:
 
 	# syscall
 	./assert.sh ./reference/syscalls/sbrk_success.c "0"
-	./assert.sh ./reference/syscalls/sbrk_fail.c "139" # segfauøts as memory is not allocated
+	./assert.sh ./reference/syscalls/sbrk_fail.c "139" # segfaults as memory is not allocated
 	./assert.sh ./reference/syscalls/function_write_syscall.c "0" "example"
 
 	# variables 
@@ -59,8 +60,6 @@ run_baby_compiler_tests:
 	./assert.sh ./reference/variables/simple_increment.c "2" ""
 	./assert.sh ./reference/variables/indirect_assigment.c "2" ""
 	./assert.sh ./reference/variables/variable_assigments.c "2" ""
-
-	exit 0
 
 tests: run_baby_compiler_tests 
 	echo "Good compiler :)"

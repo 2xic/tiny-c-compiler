@@ -89,7 +89,7 @@ class Ast2Asm:
         # TODO: Make this part of the node instead
         self.current_function = None
         self.built_in_functions = {
-            "write":SyswriteMapping(),
+            "write":SysWriteMapping(),
             "brk": Brk(),
         }
         self.global_variables = {}
@@ -101,7 +101,6 @@ class Ast2Asm:
         Okay, currently we don't have any root_file which maybe is an issue ?
         """
         # we need to start from the main file ? 
-        print(self.ast)
         assert isinstance(self.ast, File)
         assert "main" in self.ast.functions
         
@@ -149,10 +148,10 @@ class Ast2Asm:
             self.convert_nodes(node.body, output)
         elif isinstance(node, VariableDeclaration):            
             if node.parent is None:
+                # This is  global variable so we store it in the .dat section
                 self.data_sections.append(
                     f"\t{node.name}: .long 0"
                 )
-                print(node.value)
                 if isinstance(node.value, NumericValue):
                     output.append(
                         f"\tmovl ${node.value.value}, {node.name}"
@@ -226,9 +225,7 @@ class Ast2Asm:
                     output.append(self.create_sys_exit(node.value, output))
             else:
                 if isinstance(node.value, NumericValue):
-                    # We return a static value ? 
-                    # okay 
-                    output.append(f"\tmovl    ${node.value.value}, %eax")
+                    output.append(f"\tmovl ${node.value.value}, %eax")
                 elif isinstance(node.value, MathOp):
                     self.convert_nodes(node.value, output)
                 elif isinstance(node.value, VariableReference):
@@ -238,27 +235,11 @@ class Ast2Asm:
                         comment=f"Move stack value into rsp "
                     )
                 else:
-                    raise Exception("Unknown retunr op")
-                # TODO: We need to clear the push pop ...
-
+                    raise Exception("Unknown return opcode value")
+                # Reset the local values            
                 if len(output.variables_stack_location):
-                    #print(output.variables_stack_location)
-                    # RESTORE THE RSP to before we got any function arguments
-                    output.append(
-                        f"\tmov %rsp, %rbx",
-                        comment=f"Move the rsp on return"
-                    )
                     stack = len(output.variables_stack_location) * 8
-                    output.append(
-                        f"\tadd ${stack}, %rbx",
-                        comment=f"Reduce the rsp to correct offset on return"
-                    )
-                    # We now have the variable pointer in %rbx
-                    output.append(
-                        f"\tmov %rbx, %rsp",
-                        comment=f"Move the pointer value into rbx on return"
-                    )
-
+                    self.reset_stack_pointer(stack, output, reason="return statement")
                 output.append("\tret")
 
         elif isinstance(node, MathOp):
@@ -269,66 +250,35 @@ class Ast2Asm:
             # We write to EAX, but should be able to do more dynamic allocations soon
             self.handle_math_opcodes(node.expr_1, output)
             self.handle_math_opcodes(node.expr_2, output)
-
         elif isinstance(node, VariableAssignment):
-            # This should also zero out eax ....
-            # ^ technically I think we should zero eax at a different point, but okay
-            output.append(
-                f"\tmovl $0, %eax"
-            )
-            # do the math
             if isinstance(node.value, NumericValue):
                 if isinstance(node.v_reference, VariableAddressDereference):
-                    # TODO: CLean this up ...
-                    parameter_index = self.is_variable_function_parameter(node.v_reference.value.variable)
-
-                    stack = None
-                    if parameter_index == -1:
-                        stack = output.get_variable_offset(node.v_reference.value.variable)
-                    else:
-                        parameter_arguments = len(self.current_function.parameters.child_nodes) + len(output.variables_stack_location)
-                        print((node.v_reference.value.variable, parameter_index))
-                        stack = output.get_argument_stack_offset(
-                            parameter_index,
-                            parameter_arguments
-                        ) 
-
-
+                    stack_offset = self.get_stack_variable_offset(node.v_reference.value.variable, output)
                     # Dereference = You move memory into memory ...
                     # This is the location of the variable pointer
+                    self.load_stack_value_to_rax(stack_offset, output)
+                    # Then we load the value
                     output.append(
-                        f"\tmov %rsp, %rax",
-                        comment=f"Move the rsp "
-                    )
-                    output.append(
-                        f"\tadd ${stack}, %rax",
-                        comment=f"Reduce the rsp to correct offset"
-                    )
-                    # We now have the variable pointer in %rax
-                    output.append(
-                        f"\tmov (%rax), %rax",
-                        comment=f"Move the pointer value into rax "
-                    )
-                    output.append(
-                        f"\tmovq ${node.value.value}, (%rax)",
+                        f"\tmovl ${node.value.value}, (%rax)",
                         comment=f"Assign to rsp offset"
                     )
-                    pass
                 else:
                     reference_stack = output.get_or_set_stack_location(node.v_reference, None)
                     output.append(
                         f"\tmovl ${node.value.value}, {reference_stack}"
                     )
             else:
+                # In the case of function calls etc
                 self.convert_nodes(node.value, output)
                 reference_stack = output.get_or_set_stack_location(node.v_reference, None)
                 output.append(
                     f"\tmovl %eax, {reference_stack}"
                 )
-            output.append(
-                f"\tmovl $0, %eax",
-                comment="I zero out after assignment"
-            )
+                # We need to zero out eax after a function call
+                output.append(
+                    f"\tmovl $0, %eax",
+                    comment="I zero out after assignment"
+                )
         elif isinstance(node, FunctionCall):
                if node.function_name in self.built_in_functions:
                     self.built_in_functions[node.function_name].convert(
@@ -341,7 +291,7 @@ class Ast2Asm:
                         if isinstance(i, NumericValue):
                             output.append(f"\tpush ${i.value}", comment="call argument")
                         elif isinstance(i, StringValue):
-                            print("WRITE STRINGS To RO SECTION!")
+                            print("Write stirngs to the RO section")
                         elif isinstance(i, VariableReference):
                             # You just push the variable location bro
                             location = output.get_stack_value(i.variable)
@@ -356,22 +306,9 @@ class Ast2Asm:
                     )
                     # Now we need to clear the fields ... 
                     if len(node.parameters.child_nodes):
-                        # RESTORE THE RSP to before we got any function arguments
-                        # WE USE RBX HERE AS RAX IS USED FOR RETURN ARGUMENTS
-                        output.append(
-                            f"\tmov %rsp, %rbx",
-                            comment=f"Move the rsp "
-                        )
                         stack = len(node.parameters.child_nodes) * 8
-                        output.append(
-                            f"\tadd ${stack}, %rbx",
-                            comment=f"Reduce the rsp to correct offset"
-                        )
-                        # We now have the variable pointer in %rbx
-                        output.append(
-                            f"\tmov %rbx, %rsp",
-                            comment=f"Move the pointer value into rbx "
-                        )
+                        self.reset_stack_pointer(stack, output, "Input arguments to function")
+
         elif isinstance(node, Conditionals):
             self.convert_nodes(node.if_condition, output)
             # Then we need to jump 
@@ -381,38 +318,27 @@ class Ast2Asm:
         elif isinstance(node, IfCondition):
             self.convert_nodes(node.condition, output)
             assert isinstance(node.parent, Conditionals), node.parent
-            #assert isinstance(node.parent.parent, Conditionals), node.parent.parent
-            # todo: hardcoded ... fix
-            # also this should not be applied here lol.
+            # Use the id for the condition
             end_of_id = node.parent.id
+            # If we have a if and else then we check for the else condition 
             if node.parent.else_condition is not None:
                 output.append(
                     f"\tjne loc_{node.parent.else_condition.id}"
                 )
             else:
+                # We just check for the if conditional
                 output.append(
                     f"\tjne end_of_if_{end_of_id}"
                 )
             output.append(f"loc_{node.id}:")
+            # Load in the main body
             self.convert_nodes(node.body, output)
             output.append(f"\tjmp end_of_if_{end_of_id}")
         elif isinstance(node, ElseCondition):
             output.append(f"loc_{node.id}:")
             self.convert_nodes(node.body, output)
         elif isinstance(node, Equal):
-            # I want to simple resolve here, variable reference are hard to think about ... 
-            #a: VariableReference = node.a 
-            parameter_index = self.is_variable_function_parameter(node.a.variable)
-            reference_stack = None
-            if parameter_index == -1:
-                reference_stack = output.get_or_set_stack_location(node.a.variable, None)
-            else:
-                parameter_arguments = len(self.current_function.parameters.child_nodes) + len(output.variables_stack_location)
-                reference_stack = output.get_argument_stack_offset(
-                    parameter_index,
-                    parameter_arguments
-                ) + "(%rsp)"
-
+            reference_stack = self.get_stack_variable_value(node.a.variable, output)
             b: NumericValue = node.b
             output.append(
                 f"\tcmpl ${b.value}, {reference_stack}",
@@ -420,14 +346,16 @@ class Ast2Asm:
             )
         elif isinstance(node, WhileConditional):
             # Need to check this and then jump ...
-            output.append("jmp loop1")
+            output.append(f"jmp loop{node.id}")
             # Jump to the conditional
-            output.append("cloop1:")
-#            print(node.body)
+            output.append(f"cloop{node.id}:")
+            # Parse the body data
             self.convert_nodes(node.body, output)
-            output.append("\tloop1:")
+            # define the loop start + conditional
+            output.append(f"\tloop{node.id}:")
             self.convert_nodes(node.conditional, output)
-            output.append("je cloop1")
+            # Jump to while loop if true
+            output.append(f"je cloop{node.id}")
         else:
             raise Exception("Unknown node " + str(node))    
     
@@ -437,31 +365,78 @@ class Ast2Asm:
         elif isinstance(node, MathOp):
             self.convert_nodes(node, output)                
         elif isinstance(node, FunctionCall):
-            self.backup_eax_then_add_restore(node, output)
-        elif node is None:
-            pass
+            # Do a backup and then restore 
+            output.append("\tmovl %eax, %ebx", comment="Backup current value")
+            self.convert_nodes(node, output)
+            output.append(
+                f"\taddl %ebx, %eax",
+                comment="Restore the current value",
+            )
         elif isinstance(node, VariableReference):
-            # This way of looking up the arguments should be made illegal, plz fix it.
-            found_match = False
-            for index, i in enumerate(self.current_function.parameters.child_nodes):
-                if i.name == node.variable:
-                    output.append(f"\taddl {8 * (index + 1)}(%rsp), %eax")
-                    found_match = True
-                    break
-            if not found_match:
-                reference_stack = output.get_or_set_stack_location(node.variable, None)
-                output.append(f"\taddl {reference_stack}, %eax")
-
+            reference_stack = self.get_stack_variable_value(node.variable, output)
+            output.append(f"\taddl {reference_stack}, %eax")
         else:
             raise Exception(f"Unknown math op node ({node})")
-        
-    def backup_eax_then_add_restore(self, node, output):
-        output.append("\tmovl %eax, %ebx") # copy over the value
-        self.convert_nodes(node, output)
-        output.append(
-            f"\taddl %ebx, %eax",
-        )
 
+    """
+    Get stack variable dereferenced
+    """
+    def get_stack_variable_value(self, variable_name, output: AsmOutputStream):
+        return str(self.get_stack_variable_offset(variable_name, output)) + "(%rsp)"
+
+    """
+    Find the variable location on the stack (both local + call arguments)
+    """
+    def get_stack_variable_offset(self, variable_name, output: AsmOutputStream):
+        parameter_index = self.is_variable_function_parameter(variable_name)
+
+        stack_offset = None
+        if parameter_index == -1:
+            stack_offset = output.get_variable_offset(variable_name)
+        else:
+            parameter_arguments = len(self.current_function.parameters.child_nodes) + len(output.variables_stack_location)
+            stack_offset = output.get_argument_stack_offset(
+                parameter_index,
+                parameter_arguments
+            )
+        return stack_offset
+
+    """
+    This is used to for instance to reset after a function call
+
+    Input should be the calculated offset to change
+    """
+    def reset_stack_pointer(self, stack_offset, output: AsmOutputStream, reason: str):
+        output.append(
+            f"\tmov %rsp, %rbx",
+            comment=f"Move the rsp because of {reason}"
+        )
+        output.append(
+            f"\tadd ${stack_offset}, %rbx",
+            comment=f"Reduce the rsp to correct offset because of {reason}"
+        )
+        output.append(
+            f"\tmov %rbx, %rsp",
+            comment=f"Move the pointer value into rbx because of {reason}"
+        )
+    
+    """
+    Dereference the value at the given stack offset into rax
+    """
+    def load_stack_value_to_rax(self, stack_offset, output: AsmOutputStream):
+        output.append(
+            f"\tmov %rsp, %rax",
+            comment=f"Move the rsp "
+        )
+        output.append(
+            f"\tadd ${stack_offset}, %rax",
+            comment=f"Reduce the rsp to correct offset"
+        )
+        # We now have the variable pointer in %rax
+        output.append(
+            f"\tmov (%rax), %rax",
+            comment=f"Move the pointer value into rax "
+        )
 
     def create_sys_exit(self, exit_code, output: AsmOutputStream):
         if isinstance(exit_code, NumericValue):
@@ -472,7 +447,6 @@ class Ast2Asm:
             """
         elif isinstance(exit_code, VariableReference):
             if exit_code.variable in self.ast.global_variables:
-                print(exit_code.variable)
                 return f"""
                     movl    {exit_code.variable}, %ebx
                     movl    $1, %eax
@@ -487,7 +461,6 @@ class Ast2Asm:
                 """
         else:
             # Hm - not ideal way to implement this but works
-            print(exit_code)
             return f"""
         movl    {exit_code}, %ebx
         movl    $1, %eax
@@ -502,7 +475,7 @@ class Ast2Asm:
                 break
         return parameter_index
 
-class SyswriteMapping:
+class SysWriteMapping:
     def __init__(self) -> None:
         pass
 
@@ -518,7 +491,6 @@ class SyswriteMapping:
         output.append(
             "\txor     %ebx, %ebx",
         )
-
         asm_root.message_counter += 1
         asm_root.data_sections.append(
             f"\t{message_id}:  .ascii  \"{string_value}\""
@@ -529,9 +501,6 @@ class SyswriteMapping:
         output.append(
             "\tmov     $1, %rdi",
         )
-#        output.append(
-#            f"\tlea     {message_id}(%si), %rsi",
-#        )
         output.append(
             f"\tlea     {message_id}(%rip), %rsi",
         )
@@ -555,7 +524,6 @@ class Brk:
             syscall               
             """
         assert len(parameters) == 1
-        print(parameters[0])
         value = None
         if isinstance(parameters[0], NumericValue):
             value = parameters[0].value
@@ -563,9 +531,6 @@ class Brk:
         elif isinstance(parameters[0], VariableReference):
             offset = output.get_stack_value(parameters[0].variable)
             value = offset
-            #print(offset)
-            #print(parameters[0].variable)
-            #raise Exception("what")
         else:
             raise Exception("Unknown parameter")
         output.append(
@@ -577,5 +542,3 @@ class Brk:
         output.append(
             "\tsyscall"
         )
-
-#        raise Exception("Plz implement?")

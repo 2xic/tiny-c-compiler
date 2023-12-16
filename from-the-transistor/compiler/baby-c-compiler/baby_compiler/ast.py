@@ -55,7 +55,6 @@ class Tokenizer:
                     token = ""
                 is_waiting_for_new_line = True
                 index += 1
-                print("www")
             elif char == "/" and source_code[index + 1] == "*":
                 # read until \n
                 if len(token):
@@ -80,7 +79,6 @@ class Tokenizer:
             index += 1
         if len(token):
             tokens.append(token)
-        print("??")
         return tokens
     
 
@@ -352,10 +350,12 @@ class AST:
             function_scope = scopes()
             # If nothing is found
             if function_scope is None:
-                print("Failed at ", self.tokens_index.tokens[self.tokens_index.index:self.tokens_index.index+5])
                 self.tokens_index.index = checkpoint
             else:
                 break
+        
+        if function_scope is None:
+            print("Failed at ", self.tokens_index.tokens[self.tokens_index.index:self.tokens_index.index+5])
 
         if self.tokens_index == checkpoint:
             raise Exception("Failed to create AST :(")
