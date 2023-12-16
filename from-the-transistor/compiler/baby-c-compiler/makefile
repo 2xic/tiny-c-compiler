@@ -20,11 +20,11 @@ run_baby_compiler:
 	./yourprogram.o || (echo "Returned with == $$?"; exit 0)
 
 run_baby_compiler_tests:
+	./assert.sh ./reference/sbrk_success.c "0"
+	./assert.sh ./reference/sbrk_fail.c "139" # segfauøts as memory is not allocated
 	./assert.sh ./reference/function_pointer_additional_args.c "9"
-
 	./assert.sh ./reference/local_if_new_function_scope.c "13"
 	./assert.sh ./reference/conditionals_local_pointer.c "9"
-
 	./assert.sh ./reference/local_variables_in_new_function_scope.c "13"
 	./assert.sh ./reference/pointer_function_call.c "9"
 	./assert.sh ./reference/memory_pointers.c "9"

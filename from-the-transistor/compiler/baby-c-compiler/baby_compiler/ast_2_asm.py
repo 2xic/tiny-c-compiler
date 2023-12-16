@@ -89,7 +89,8 @@ class Ast2Asm:
         # TODO: Make this part of the node instead
         self.current_function = None
         self.built_in_functions = {
-            "write":SyswriteMapping()
+            "write":SyswriteMapping(),
+            "brk": Brk(),
         }
         self.global_variables = {}
         self.message_counter = 2
@@ -540,3 +541,41 @@ class SyswriteMapping:
         output.append(
             "\tsyscall"
         )
+
+
+class Brk:
+    def __init__(self) -> None:
+        pass
+
+    def convert(self, parameters, asm_root: Ast2Asm, output: AsmOutputStream):
+        """
+        sbrk syscall 2 get program segment
+            mov   $12, %rax         
+            mov   $0, %rdi          
+            syscall               
+            """
+        assert len(parameters) == 1
+        print(parameters[0])
+        value = None
+        if isinstance(parameters[0], NumericValue):
+            value = parameters[0].value
+            value = f"${value}"
+        elif isinstance(parameters[0], VariableReference):
+            offset = output.get_stack_value(parameters[0].variable)
+            value = offset
+            #print(offset)
+            #print(parameters[0].variable)
+            #raise Exception("what")
+        else:
+            raise Exception("Unknown parameter")
+        output.append(
+            "\tmov     $12, %rax",
+        )
+        output.append(
+            f"\tmov     {value}, %rdi",
+        )
+        output.append(
+            "\tsyscall"
+        )
+
+#        raise Exception("Plz implement?")
