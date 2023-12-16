@@ -367,7 +367,7 @@ class AST:
         if return_parameter in self.types:
             name = self.tokens_index.get_token()
             if name.isalnum():
-                parameters = self.get_function_arguments()
+                parameters = self.get_function_definition_arguments()
                 if parameters is None:
                     return None
                 body = self.parse_function_body()
@@ -382,32 +382,7 @@ class AST:
                 )
         return None
 
-    def get_function_arguments(self):
-        # This is used ny both the call function and definition function
-        # TODO ^ change that 
-        if self.tokens_index.get_token() == "(":
-            parameters = []
-            while not self.tokens_index.peek_token() == ")":
-                if self.tokens_index.peek_token() == "int":
-                    parameters.append(
-                        VariableDeclaration(
-                            type=self.tokens_index.get_token(),
-                            name=self.tokens_index.get_token(),
-                            value=None,
-                        )
-                    )
-                    self.variables[parameters[-1].name] = True
-                elif self.tokens_index.peek_token() == ",":
-                    self.tokens_index.get_token()
-                else:
-                    raise Exception(f"Unknown input '{self.tokens_index.peek_token()}'")
-            assert self.tokens_index.get_token() == ")"
-            return Parameters(parameters)
-        return None
-
     def get_function_call_arguments(self):
-        # This is used ny both the call function and definition function
-        # TODO ^ change that 
         if self.tokens_index.get_token() == "(":
             parameters = []
             while not self.tokens_index.peek_token() == ")":
@@ -424,12 +399,41 @@ class AST:
                     parameters.append(StringValue(
                         value
                     ))
+                elif self.tokens_index.peek_token() in self.variables:
+                    parameters.append(VariableReference(
+                        self.tokens_index.get_token()
+                    ))
                 else:
-                    raise Exception(f"Unknown input {self.tokens_index.peek_token()}")
+                    raise Exception(f"Unknown call argument {self.tokens_index.peek_token()}")
             assert self.tokens_index.get_token() == ")"
             return Parameters(parameters)
         return None
-    
+
+    def get_function_definition_arguments(self):
+        if self.tokens_index.get_token() == "(":
+            parameters = []
+            while not self.tokens_index.peek_token() == ")":
+                if self.tokens_index.peek_token() in self.types:
+                    type_value = self.tokens_index.get_token()
+                    pointer = self.tokens_index.peek_token() == "*"
+                    if pointer:
+                        type_value += self.tokens_index.get_token()
+                    parameters.append(
+                        VariableDeclaration(
+                            type=type_value,
+                            name=self.tokens_index.get_token(),
+                            value=None,
+                        )
+                    )
+                    self.variables[parameters[-1].name] = True
+                elif self.tokens_index.peek_token() == ",":
+                    self.tokens_index.get_token()
+                else:
+                    raise Exception(f"Unknown input '{self.tokens_index.peek_token()}'")
+            assert self.tokens_index.get_token() == ")"
+            return Parameters(parameters)
+        return None
+
     def parse_function_body(self):
         if self.tokens_index.get_token() == "{":
             found_token = True
@@ -503,7 +507,6 @@ class AST:
     
     def get_return_definition(self):
         if self.tokens_index.get_token() == "return":
-            print(self.tokens_index.tokens[self.tokens_index.index:self.tokens_index.index+5])
             math_expression = self.get_math_expression()
             if math_expression is None:
                 return None
@@ -544,11 +547,10 @@ class AST:
             else:
                 raise Exception("Unknown expression node {token}")
         else:
-            raise Exception(f"Unknown expression node {token}")
+            raise Exception(f"Unknown expression node {token} - bad call ?")
         
     def get_inline_function_call(self):
         value = self.get_function_call()        
-        print((value))
         if value is not None and self.tokens_index.peek_token() == ";":
             assert self.tokens_index.get_token() == ";"
             return value
