@@ -2,6 +2,8 @@
 The AST has the ast logic.
 """
 from typing import Optional
+from .exceptions import InvalidSyntax
+
 class Token:
     def __init__(self, value) -> None:
         self.value = value
@@ -336,8 +338,12 @@ class AST:
             file_nodes = self.get_root_symbols()
             file.child_nodes.append(file_nodes)
             if isinstance(file_nodes, FunctionDefinition):
+                if file_nodes.name in file.functions:
+                    raise InvalidSyntax(f"Invalid - re-declaration of variable of {file_nodes.name}")
                 file.functions[file_nodes.name] = assign_global_values.assign_scope(file_nodes)
             elif isinstance(file_nodes, VariableDeclaration):
+                if file_nodes.name in file.global_variables:
+                    raise InvalidSyntax(f"Invalid - re-declaration of variable of {file_nodes.name}")
                 file.global_variables[file_nodes.name] = file_nodes
 
         assert self.tokens_index.index == len(self.tokens),  "Failed to parse source code..."
