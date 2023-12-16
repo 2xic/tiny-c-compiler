@@ -334,6 +334,10 @@ class AST:
 
         prev_token = -1
         while prev_token !=  self.tokens_index.index and self.tokens_index.index < len(self.tokens):
+            # Keep track of global variables only
+            old_variables = {
+                key:value for key, value in self.variables.items()
+            }
             prev_token =  self.tokens_index.index
             file_nodes = self.get_root_symbols()
             file.child_nodes.append(file_nodes)
@@ -341,6 +345,8 @@ class AST:
                 if file_nodes.name in file.functions:
                     raise InvalidSyntax(f"Invalid - re-declaration of variable of {file_nodes.name}")
                 file.functions[file_nodes.name] = assign_global_values.assign_scope(file_nodes)
+                # Reset the variables between scopes
+                self.variables = old_variables
             elif isinstance(file_nodes, VariableDeclaration):
                 if file_nodes.name in file.global_variables:
                     raise InvalidSyntax(f"Invalid - re-declaration of variable of {file_nodes.name}")
@@ -553,7 +559,7 @@ class AST:
             else:
                 raise Exception("Unknown expression node {token}")
         else:
-            raise Exception(f"Unknown expression node {token} - bad call ?")
+            raise InvalidSyntax(f"Unknown expression node {token} - bad call ?")
         
     def get_inline_function_call(self):
         value = self.get_function_call()        

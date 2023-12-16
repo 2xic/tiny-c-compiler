@@ -1,16 +1,44 @@
 # Status
-Currently we only support very basic stuff. No printf, no fancy stuff.
+Currently we only support very basic stuff. 
+- We only support datatype `int` atm.
+- `write` - only to stdout
+- `brk` - limited heap support 
+- `if`, `else` - no `else if` yet and limited conditional checks (only equal check)
+- `while` 
+- function calls + function definitions
+- single pointer (e.g `int*`) support
 
 You can basically not do anything more fancy than what is shown below (yet)
 ```c
-int anotherFunction (int a, int b){
-    return a + b;
+int printDone(int *c){
+    write(1, 1, "done\n");
+
+    *c = 10;
+
+    return 5;
 }
 
 int main(){
-    int a = anotherFunction(5, 9);
-    
-    return a;
+    int a = 4;
+    int b = 0;
+    int c = 0;
+    int *p = &c;
+
+    while(a == 4) {
+        b = b + 1;
+
+        if (b == 10) {
+            a = 0;
+        }
+
+        write(1, 1, "counting\n");
+    }
+
+    if (a == 0){
+        b = printDone(p);
+    }
+
+    return b + c; // returns 15
 }
 ```
 

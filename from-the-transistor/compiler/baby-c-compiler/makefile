@@ -20,10 +20,15 @@ run_baby_compiler:
 	./yourprogram.o || (echo "Returned with == $$?"; exit 0)
 
 run_baby_compiler_tests:
+	# examples
+	./assert.sh ./reference/examples/count_2_10_then_print.c "15"
+
 	# syntax validation
 	./assert_syntax_error.sh ./reference/invalid_syntax/duplicate_variables_in_same_scope.c "255"
 	./assert_syntax_error.sh ./reference/invalid_syntax/duplicate_functions.c "255"
 	./assert_syntax_error.sh ./reference/invalid_syntax/duplicate_global_variables.c "255"
+	./assert_syntax_error.sh ./reference/invalid_syntax/usage_of_undeclared_variable.c "255"	
+	./assert_syntax_error.sh ./reference/invalid_syntax/usage_of_undeclared_variable_scope.c "255"
 
 	# control_flow
 	./assert.sh ./reference/control_flow/while_loops_without_else.c "10" ""

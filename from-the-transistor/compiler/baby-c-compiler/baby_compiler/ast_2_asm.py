@@ -292,6 +292,10 @@ class Ast2Asm:
                         f"\tmovl ${node.value.value}, {reference_stack}"
                     )
             else:
+                output.append(
+                    f"\tmovl $0, %eax",
+                    comment="I zero out after assignment"
+                )
                 # In the case of function calls etc
                 self.convert_nodes(node.value, output)
                 reference_stack = output.get_or_set_stack_location(node.v_reference, None)
