@@ -3,6 +3,7 @@ We got nice AST output, we need nice output :)
 """
 from .ast import File, FunctionDefinition, ReturnDefinition, FunctionBody, VariableDeclaration, NumericValue, MathOp, VariableAssignment, FunctionCall, VariableReference, StringValue, Conditionals, IfCondition, ElseCondition, Equal, WhileConditional, VariableAddressReference, VariableAddressDereference
 from .exceptions import InvalidSyntax
+import re
 
 class AsmOutputStream:
     def __init__(self, name, global_variables, output_stream) -> None:
@@ -152,6 +153,17 @@ class Ast2Asm:
 
         # Need to insert one new lien at the end else the compiler is mad
         combined = global_variables + main_function_output.output_stream + other_functions + self.data_sections
+        # TODO: Make this nicer and ideally part of the output logic
+        for index in range(len(combined)):
+            output = []
+            lines = combined[index].split("\n")
+            for i in lines:
+                clean_text = re.sub(r"^\s+","", i)
+                clean_text = re.sub(' +', ' ', clean_text)
+                if not ":" in clean_text and not "." in clean_text:
+                    clean_text = "\t" + clean_text
+                output.append(clean_text)
+            combined[index] = "\n".join(output)
         return "\n".join(list(filter(lambda x: len(x.strip()) > 0, "\n".join(combined).split("\n")))) + "\n"
 
     def convert_nodes(self, node, output: AsmOutputStream):
