@@ -26,9 +26,19 @@ class AsmOutputStream:
         ])
     
     @staticmethod
+    def text_section(global_variables):
+        return AsmOutputStream("text", global_variables,  [
+            """
+            .text
+            """            
+        ])
+    
+    @staticmethod
     def defined_function(name, global_variables):
         return AsmOutputStream(name, global_variables,  [
             f"""
+                .globl	{name}
+                .type	{name}, @function
                 {name}: 
                     movl $0, %eax
             """            
@@ -115,10 +125,13 @@ class Ast2Asm:
         """
         # we need to start from the main file ? 
         assert isinstance(self.ast, File)
-        assert "main" in self.ast.functions
         # Load the main function
-        main_function_output = AsmOutputStream.main_function(self.ast.global_variables)
-        self.convert_nodes(self.ast.functions["main"], main_function_output)
+        main_function_output = None
+        if  "main" in self.ast.functions:
+            main_function_output = AsmOutputStream.main_function(self.ast.global_variables)
+            self.convert_nodes(self.ast.functions["main"], main_function_output)
+        else:
+            main_function_output = AsmOutputStream.text_section(self.ast.global_variables)
 
         # Load global variables
         global_variables = []
@@ -336,7 +349,7 @@ class Ast2Asm:
                         else:
                             raise Exception("Unknown parameter")
                     output.append(
-                        f"\tcall {node.function_name}"
+                        f"\tcall {node.function_name}@PLT"
                     )
                     # Now we need to clear the fields ... 
                     if len(node.parameters.child_nodes):

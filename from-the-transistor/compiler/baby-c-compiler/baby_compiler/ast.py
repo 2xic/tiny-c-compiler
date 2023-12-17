@@ -136,6 +136,11 @@ class FunctionDefinition(Nodes):
             self.return_parameters
         ]
 
+class ExternalFunctionDefinition(Nodes):
+    def __init__(self, name) -> None:
+        super().__init__()
+        self.name = name
+
 class FunctionCall(Nodes):
     def __init__(self, function_name, parameters: Parameters) -> None:
         super().__init__()
@@ -382,6 +387,11 @@ class AST:
                 parameters = self.get_function_definition_arguments()
                 if parameters is None:
                     return None
+                if self.tokens_index.peek_token() == ";":
+                    assert self.tokens_index.get_token() == ";"
+                    return ExternalFunctionDefinition(
+                        name,
+                    )
                 body = self.parse_function_body()
                 if body is None:
                     return None

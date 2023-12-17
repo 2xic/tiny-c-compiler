@@ -31,10 +31,6 @@ fi
 
 if [ ! -z "$3" ]
   then
-    #echo "Got another field :)"
-    #echo $output
-    #echo $3
-    #exit 0
     if test "$output" = "$3"
     then
         echo "Output are equal"
