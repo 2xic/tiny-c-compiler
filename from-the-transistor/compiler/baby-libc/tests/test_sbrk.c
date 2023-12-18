@@ -1,9 +1,9 @@
 // Need to handle imports
 
 // Put this into the PLT
-int sbrk();
+int sbrk(int increment);
 
 int main(){
-    int a = sbrk();
+    int a = sbrk(5);
     return a;
 }

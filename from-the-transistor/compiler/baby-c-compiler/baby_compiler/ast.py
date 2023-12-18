@@ -325,7 +325,8 @@ class AST:
     def __init__(self, tokens) -> None:
         self.tokens = tokens
         self.types = {
-            "int": TypeDefinition("int")
+            "int": TypeDefinition("int"),
+            "int*": TypeDefinition("int*"),
         }
         # Need to reconsider this... Is this how we want to create the tree?
         self.variables = {}
@@ -383,7 +384,7 @@ class AST:
         return_parameter = self.tokens_index.get_token()
         if return_parameter in self.types:
             name = self.tokens_index.get_token()
-            if name.isalnum():
+            if self.is_valid_variable(name):
                 parameters = self.get_function_definition_arguments()
                 if parameters is None:
                     return None
@@ -408,10 +409,10 @@ class AST:
         if self.tokens_index.get_token() == "(":
             parameters = []
             while not self.tokens_index.peek_token() == ")":
-                if self.tokens_index.peek_token().isnumeric():
-                    parameters.append(NumericValue(
-                        self.tokens_index.get_token()
-                    ))
+                numeric = self.get_numeric()
+                # TODO: We could here also in theory do math operations
+                if numeric is not None:
+                    parameters.append(numeric)
                 elif self.tokens_index.peek_token() == ",":
                     self.tokens_index.get_token()
                 elif self.tokens_index.peek_token() == '"':
@@ -435,11 +436,8 @@ class AST:
         if self.tokens_index.get_token() == "(":
             parameters = []
             while not self.tokens_index.peek_token() == ")":
-                if self.tokens_index.peek_token() in self.types:
-                    type_value = self.tokens_index.get_token()
-                    pointer = self.tokens_index.peek_token() == "*"
-                    if pointer:
-                        type_value += self.tokens_index.get_token()
+                type_value = self.get_type()
+                if type_value is not None:
                     parameters.append(
                         VariableDeclaration(
                             type=type_value,
@@ -482,49 +480,49 @@ class AST:
         return None
     
     def get_variable_declaration_or_assignment(self):
-        type_value = self.tokens_index.get_token()
-        if type_value in self.types:
-            pointer = self.tokens_index.peek_token() == "*"
-            if pointer:
-                type_value += self.tokens_index.get_token()
+        type_value = self.get_type()
+        if type_value is not None:
             name = self.tokens_index.get_token()
-            if name.isalnum():
+            if self.is_valid_variable(name):
                 if self.tokens_index.is_peek_token("="):
                     math_expression = self.get_math_expression()
                     if self.tokens_index.get_token() == ";" and math_expression is not None:
                         # variable initiation
                         self.variables[name] = True
                         return VariableDeclaration(
-                            TypeDefinition(type_value),
+                            type_value,
                             name,
                             math_expression
                         )
                 elif self.tokens_index.is_peek_token(";"):
                     self.variables[name] = True
                     return VariableDeclaration(
-                        TypeDefinition(type_value),
+                        type_value,
                         name,
                         None
                     )
-        elif type_value in self.variables:
-            # This is an assignment ... 
-            if self.tokens_index.is_peek_token("="):
-                math_expression = self.get_math_expression()
-                if self.tokens_index.get_token() == ";" and math_expression is not None:
-                    return VariableAssignment(
-                        type_value,
-                        math_expression,
-                    )
-        elif type_value == "*":
-            value = self.tokens_index.get_token()
-            if value in self.variables:
+        else:
+            token = self.tokens_index.get_token()
+            if token in self.variables:
+                # This is an assignment ... 
                 if self.tokens_index.is_peek_token("="):
                     math_expression = self.get_math_expression()
                     if self.tokens_index.get_token() == ";" and math_expression is not None:
                         return VariableAssignment(
-                            VariableAddressDereference(VariableReference(value)),
-                            math_expression,                            
+                            token,
+                            math_expression,
                         )
+            elif token == "*":
+                # Dereference
+                value = self.tokens_index.get_token()
+                if value in self.variables:
+                    if self.tokens_index.is_peek_token("="):
+                        math_expression = self.get_math_expression()
+                        if self.tokens_index.get_token() == ";" and math_expression is not None:
+                            return VariableAssignment(
+                                VariableAddressDereference(VariableReference(value)),
+                                math_expression,                            
+                            )
         return None
     
     def get_return_definition(self):
@@ -554,8 +552,9 @@ class AST:
 
     def get_expression(self):
         token = self.tokens_index.peek_token()
-        if token.isnumeric():
-            return NumericValue(self.tokens_index.get_token())
+        numeric = self.get_numeric()
+        if numeric is not None:
+            return numeric
         elif token.isalnum() and self.tokens_index.peek_token(1) == "(":
             return self.get_function_call()
         elif token in self.variables:
@@ -629,9 +628,9 @@ class AST:
             if token in self.variables:
                 first_expression = VariableReference(token)
                 # Get the next token
-                second_expression = self.tokens_index.get_token()
-                if second_expression.isnumeric():
-                    second_expression = NumericValue(second_expression)
+                numeric = self.get_numeric()
+                if not numeric is None:
+                    second_expression = numeric
                     assert self.tokens_index.get_token() == ")"
                     return Equal(
                         first_expression,
@@ -643,3 +642,29 @@ class AST:
                 raise Exception("Not supported yet ... ")
         return None
     
+    def get_type(self):
+        if self.tokens_index.peek_token() in self.types:
+            type_name = self.tokens_index.get_token()
+            pointer = self.tokens_index.peek_token() == "*"
+            if pointer:
+                pointer = self.tokens_index.get_token()
+                return TypeDefinition(type_name + pointer )
+            else:
+                return TypeDefinition(type_name)
+        return None
+    
+    def get_numeric(self):
+        if self.tokens_index.peek_token() == "-" and self.tokens_index.peek_token(1).isnumeric():
+            _ = self.tokens_index.get_token()
+            token = self.tokens_index.get_token()
+            if token.isnumeric():
+                return NumericValue("-" + token)
+        elif self.tokens_index.peek_token().isnumeric():
+            token = self.tokens_index.get_token()
+            if token.isnumeric():
+                return NumericValue(token)
+        else:
+            return None
+    
+    def is_valid_variable(self, name):
+        return name.isidentifier()

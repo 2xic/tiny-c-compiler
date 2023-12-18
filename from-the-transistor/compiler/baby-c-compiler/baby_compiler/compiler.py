@@ -14,8 +14,13 @@ def compile(file):
         asm = Ast2Asm(file_ast) 
         return asm.get_asm()
     except InvalidSyntax as e:
+        print(file)
+        print(e)
         exit(-1)
-
+    except AssertionError as e:
+        print(file)
+        print(e)
+        exit(-1)
 
 if __name__ == "__main__":
     input_file = sys.argv[1]
