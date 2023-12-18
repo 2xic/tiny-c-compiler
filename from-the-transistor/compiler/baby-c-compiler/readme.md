@@ -42,6 +42,16 @@ int main(){
 }
 ```
 
+# TODO 
+
+items before I say "okay this is good enough and been a nice project"
+- Implement `malloc` and `free`
+- Implement `printf` 
+- Implement `FILE` ? 
+- Implement `assert` ? 
+
+# Notes
+
 ## Resources
 - https://www.wilfred.me.uk/blog/2014/08/27/baby-steps-to-a-c-compiler/
 

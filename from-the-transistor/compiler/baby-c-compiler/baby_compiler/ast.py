@@ -321,6 +321,11 @@ class AssignGlobalValues:
                 self.assign_scope(i)
         return node
 
+class Struct(Nodes):
+    def __init__(self, members) -> None:
+        super().__init__()
+        self.members = []
+
 class AST:
     def __init__(self, tokens) -> None:
         self.tokens = tokens
@@ -332,10 +337,15 @@ class AST:
         self.variables = {}
         self.id = 0
         self.tokens_index = TokenConsumer(self.tokens)
+        # TODO: Make this shared with the ast_2_asm logic
+        self.global_functions = [
+            "write",
+            "brk"
+        ]
 
     def build_ast(self):
         # Statements currently supported are only tokens
-        file = File("example.c")
+        self.file = File("example.c")
         assign_global_values = AssignGlobalValues()
 
         prev_token = -1
@@ -346,25 +356,27 @@ class AST:
             }
             prev_token =  self.tokens_index.index
             file_nodes = self.get_root_symbols()
-            file.child_nodes.append(file_nodes)
+            self.file.child_nodes.append(file_nodes)
             if isinstance(file_nodes, FunctionDefinition):
-                if file_nodes.name in file.functions:
+                if file_nodes.name in self.file.functions:
                     raise InvalidSyntax(f"Invalid - re-declaration of variable of {file_nodes.name}")
-                file.functions[file_nodes.name] = assign_global_values.assign_scope(file_nodes)
+                self.file.functions[file_nodes.name] = assign_global_values.assign_scope(file_nodes)
                 # Reset the variables between scopes
                 self.variables = old_variables
+            elif isinstance(file_nodes, ExternalFunctionDefinition):
+                self.global_functions.append(file_nodes.name)
             elif isinstance(file_nodes, VariableDeclaration):
-                if file_nodes.name in file.global_variables:
+                if file_nodes.name in self.file.global_variables:
                     raise InvalidSyntax(f"Invalid - re-declaration of variable of {file_nodes.name}")
-                file.global_variables[file_nodes.name] = file_nodes
+                self.file.global_variables[file_nodes.name] = file_nodes
 
         assert self.tokens_index.index == len(self.tokens),  "Failed to parse source code..."
-        return file
+        return self.file
 
     def get_root_symbols(self):
         # grammar: [return type] [function name] [parameter start] .... [parameter end] [scope start]
         checkpoint = self.tokens_index.index
-        for scopes in [self.get_function_definition, self.get_variable_declaration_or_assignment]:
+        for scopes in [self.get_function_definition, self.get_variable_declaration_or_assignment, self.get_struct_definition]:
             function_scope = scopes()
             # If nothing is found
             if function_scope is None:
@@ -381,8 +393,8 @@ class AST:
         return function_scope
 
     def get_function_definition(self):
-        return_parameter = self.tokens_index.get_token()
-        if return_parameter in self.types:
+        return_type = self.get_type()
+        if return_type is not None:
             name = self.tokens_index.get_token()
             if self.is_valid_variable(name):
                 parameters = self.get_function_definition_arguments()
@@ -401,7 +413,7 @@ class AST:
                     name,
                     parameters,
                     body,
-                    TypeDefinition(return_parameter)
+                    return_type
                 )
         return None
 
@@ -488,19 +500,21 @@ class AST:
                     math_expression = self.get_math_expression()
                     if self.tokens_index.get_token() == ";" and math_expression is not None:
                         # variable initiation
-                        self.variables[name] = True
-                        return VariableDeclaration(
+                        value = VariableDeclaration(
                             type_value,
                             name,
                             math_expression
                         )
+                        self.variables[name] = value
+                        return value
                 elif self.tokens_index.is_peek_token(";"):
-                    self.variables[name] = True
-                    return VariableDeclaration(
+                    value = VariableDeclaration(
                         type_value,
                         name,
                         None
                     )
+                    self.variables[name] = value
+                    return value
         else:
             token = self.tokens_index.get_token()
             if token in self.variables:
@@ -578,12 +592,15 @@ class AST:
     
     def get_function_call(self):
         token = self.tokens_index.get_token()
-        if  self.tokens_index.peek_token(0) == "(":
-            function_arguments = self.get_function_call_arguments()
-            return FunctionCall(
-                token,
-                function_arguments,
-            )
+        if self.tokens_index.peek_token(0) == "(":
+            if token in self.file.functions or token in self.global_functions:
+                function_arguments = self.get_function_call_arguments()
+                return FunctionCall(
+                    token,
+                    function_arguments,
+                )
+            else:
+                raise InvalidSyntax()
 
     def parse_conditional_statements(self):
         token = self.tokens_index.get_token()
@@ -652,7 +669,40 @@ class AST:
             else:
                 return TypeDefinition(type_name)
         return None
-    
+
+    def get_struct_definition(self):
+        if self.tokens_index.peek_token() == "struct":
+            assert self.tokens_index.get_token() == "struct"
+            type_name = self.tokens_index.get_token()
+            members = self.parse_struct_members()
+            assert self.tokens_index.get_token() == ";"
+            return Struct(
+                members=members,
+            )
+        return None
+
+    def parse_struct_members(self):
+        if self.tokens_index.get_token() == "{":
+            found_token = True
+            members = []
+            while found_token:
+                for create_node in [
+                    self.get_variable_declaration_or_assignment,
+                ]:                    
+                    local_check_point = self.tokens_index.index
+                    node_definition = create_node()
+                    if node_definition is None:
+                        found_token = False
+                        self.tokens_index.index = local_check_point
+                    else:
+                        members.append(node_definition)
+                        found_token = True
+                        break
+            # if it all failed
+            if self.tokens_index.get_token() == "}":
+                return members 
+        return None
+        
     def get_numeric(self):
         if self.tokens_index.peek_token() == "-" and self.tokens_index.peek_token(1).isnumeric():
             _ = self.tokens_index.get_token()
@@ -668,3 +718,4 @@ class AST:
     
     def is_valid_variable(self, name):
         return name.isidentifier()
+

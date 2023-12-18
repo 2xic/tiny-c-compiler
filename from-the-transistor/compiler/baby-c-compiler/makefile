@@ -29,6 +29,8 @@ run_baby_compiler_tests:
 	./assert_syntax_error.sh ./reference/invalid_syntax/duplicate_global_variables.c "255"
 	./assert_syntax_error.sh ./reference/invalid_syntax/usage_of_undeclared_variable.c "255"	
 	./assert_syntax_error.sh ./reference/invalid_syntax/usage_of_undeclared_variable_scope.c "255"
+	./assert_syntax_error.sh ./reference/invalid_syntax/function_must_be_defined.c "255"
+	./assert_syntax_error.sh ./reference/invalid_syntax/variable_must_be_defined.c "255"
 
 	# control_flow
 	./assert.sh ./reference/control_flow/while_loops_without_else.c "10" ""

@@ -94,3 +94,17 @@ if __name__ == "__main__":
             }
         """
     )
+    source_code_test(
+        """
+            struct TestStruct
+            {
+                int myNum1;
+                int myNum2;
+            };
+
+            int main()
+            {
+                return 0;
+            }
+        """
+    )
