@@ -185,15 +185,16 @@ class File(Nodes):
         self.name = name
         self.functions = {}
         self.global_variables = {}
+        self.global_types = {}
 
 class VariableDeclaration(Nodes):
-    def __init__(self, type, name, value) -> None:
+    def __init__(self, type: TypeDefinition, name, value) -> None:
         super().__init__()
         self.type = type
         self.is_pointer = "*" in str(self.type)#.name
         self.name = name
         self.value = value
-        self.child_nodes = [value]
+        self.child_nodes = [type, value]
 
 class MathOp(Nodes):
     def __init__(self, op, expr_1, expr_2) -> None:
@@ -323,9 +324,10 @@ class AssignGlobalValues:
         return node
 
 class Struct(Nodes):
-    def __init__(self, members) -> None:
+    def __init__(self, name, members) -> None:
         super().__init__()
-        self.members = []
+        self.name = name
+        self.members = members
 
 class StructMemberAccess(Nodes):
     def __init__(self, variable_reference: VariableReference, member_name: str) -> None:
@@ -336,6 +338,9 @@ class StructMemberAccess(Nodes):
         ]
         self.variable_reference = variable_reference
         self.value = member_name 
+
+    def get_path(self):
+        return self.variable_reference + "."+ self.value
 
 class AST:
     def __init__(self, tokens) -> None:
@@ -376,6 +381,8 @@ class AST:
                 self.variables = old_variables
             elif isinstance(file_nodes, ExternalFunctionDefinition):
                 self.global_functions.append(file_nodes.name)
+            elif isinstance(file_nodes, Struct):
+                self.file.global_types[file_nodes.name] = file_nodes
             elif isinstance(file_nodes, VariableDeclaration):
                 if file_nodes.name in self.file.global_variables:
                     raise InvalidSyntax(f"Invalid - re-declaration of variable of {file_nodes.name}")
@@ -704,10 +711,11 @@ class AST:
     def get_struct_definition(self):
         if self.tokens_index.peek_token() == "struct":
             assert self.tokens_index.get_token() == "struct"
-            _ = self.tokens_index.get_token()
+            name = self.tokens_index.get_token()
             members = self.parse_struct_members()
             assert self.tokens_index.get_token() == ";"
             return Struct(
+                name=name, 
                 members=members,
             )
         return None

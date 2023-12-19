@@ -20,6 +20,11 @@ run_baby_compiler:
 	./yourprogram.o || (echo "Returned with == $$?"; exit 0)
 
 run_baby_compiler_tests:
+	# types
+	./assert.sh ./reference/types/simple_struct.c "2"
+	./assert.sh ./reference/types/struct.c "6"
+	./assert.sh ./reference/types/multiple_structs.c "8"
+
 	# examples
 	./assert.sh ./reference/examples/count_2_10_then_print.c "15"
 

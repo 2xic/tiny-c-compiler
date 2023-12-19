@@ -1,7 +1,7 @@
 """
 We got nice AST output, we need nice output :)
 """
-from .ast import File, FunctionDefinition, ReturnDefinition, FunctionBody, VariableDeclaration, NumericValue, MathOp, VariableAssignment, FunctionCall, VariableReference, StringValue, Conditionals, IfCondition, ElseCondition, Equal, WhileConditional, VariableAddressReference, VariableAddressDereference, StructMemberAccess
+from .ast import File, FunctionDefinition, ReturnDefinition, FunctionBody, VariableDeclaration, NumericValue, MathOp, VariableAssignment, FunctionCall, VariableReference, StringValue, Conditionals, IfCondition, ElseCondition, Equal, WhileConditional, VariableAddressReference, VariableAddressDereference, StructMemberAccess, Struct
 from .exceptions import InvalidSyntax
 import re
 
@@ -50,6 +50,9 @@ class AsmOutputStream:
         return AsmOutputStream("var", {},  [])
     
     def get_or_set_stack_location(self, name, value):
+        if isinstance(name, StructMemberAccess):
+            name = name.get_path()
+
         assert len(name.split(" ")) == 1
         if not name in self.variables_stack_location:
             self.variables_stack_location[name] = (len(self.variables_stack_location) + 1)
@@ -65,10 +68,12 @@ class AsmOutputStream:
             return f"pushq {value}"
         
     def get_stack_value(self, name):
+        if isinstance(name, StructMemberAccess):
+            name = name.get_path()
         # Note: In this case we do dereference the value
         location = self.get_variable_offset(name)
         return f"{location}(%rsp)"
-    
+        
     def get_argument_stack_offset(self, index, size):
         # Argument would be at the location 1 + {size - index}
         location = ((size - index) ) * 8 # Always add one for the ret
@@ -83,6 +88,9 @@ class AsmOutputStream:
     
 
     def get_variable_offset(self, name):
+        if isinstance(name, StructMemberAccess):
+            name = name.get_path()
+
         delta = (self.stack_location_offset - self.variables_stack_location[name])
         location = delta  * 8
         return location
@@ -124,6 +132,7 @@ class Ast2Asm:
         """
         Okay, currently we don't have any root_file which maybe is an issue ?
         """
+        print(self.ast)
         # we need to start from the main file ? 
         assert isinstance(self.ast, File)
         # Load the main function
@@ -252,7 +261,18 @@ class Ast2Asm:
                             f"\tmovl $0, %eax",
                             comment="I zero out after assignment"
                         )
-                else:
+                elif "struct" in node.type.name:
+                    # For each member we allocate a variable ... bit hacky, but works for now
+                    members =  self.ast.global_types[node.type.name.split("struct ")[-1]]
+                    for i in members.members:
+                        output.append(
+                            load_value(
+                                NumericValue(0),
+                                PushLocation(node.name + "." + i.name),
+                                output,
+                            )
+                        )
+                else:                
                     # still need to push a empty item to the stack to allocate it 
                     output.append(
                         load_value(
@@ -312,14 +332,10 @@ class Ast2Asm:
                         comment=f"Assign to rsp offset"
                     )
                 else:
-                    if isinstance(node.v_reference, StructMemberAccess):
-                        # TODO: Implement this access
-                        pass
-                    else: 
-                        reference_stack = output.get_or_set_stack_location(node.v_reference, None)
-                        output.append(
-                            f"\tmovl ${node.value.value}, {reference_stack}"
-                        )
+                    reference_stack = output.get_or_set_stack_location(node.v_reference, None)
+                    output.append(
+                        f"\tmovl ${node.value.value}, {reference_stack}"
+                    )
             else:
                 output.append(
                     f"\tmovl $0, %eax",
@@ -436,11 +452,8 @@ class Ast2Asm:
                 comment="Restore the current value",
             )
         elif isinstance(node, VariableReference):
-            if isinstance(node.variable, StructMemberAccess):
-                output.append("TODO")
-            else:
-                reference_stack = self.get_stack_variable_value(node.variable, output)
-                output.append(f"\taddl {reference_stack}, %eax")
+            reference_stack = self.get_stack_variable_value(node.variable, output)
+            output.append(f"\taddl {reference_stack}, %eax")
         else:
             raise Exception(f"Unknown math op node ({node})")
 
