@@ -1,7 +1,7 @@
 """
 We got nice AST output, we need nice output :)
 """
-from .ast import File, FunctionDefinition, ReturnDefinition, FunctionBody, VariableDeclaration, NumericValue, MathOp, VariableAssignment, FunctionCall, VariableReference, StringValue, Conditionals, IfCondition, ElseCondition, Equal, WhileConditional, VariableAddressReference, VariableAddressDereference
+from .ast import File, FunctionDefinition, ReturnDefinition, FunctionBody, VariableDeclaration, NumericValue, MathOp, VariableAssignment, FunctionCall, VariableReference, StringValue, Conditionals, IfCondition, ElseCondition, Equal, WhileConditional, VariableAddressReference, VariableAddressDereference, StructMemberAccess
 from .exceptions import InvalidSyntax
 import re
 
@@ -312,10 +312,14 @@ class Ast2Asm:
                         comment=f"Assign to rsp offset"
                     )
                 else:
-                    reference_stack = output.get_or_set_stack_location(node.v_reference, None)
-                    output.append(
-                        f"\tmovl ${node.value.value}, {reference_stack}"
-                    )
+                    if isinstance(node.v_reference, StructMemberAccess):
+                        # TODO: Implement this access
+                        pass
+                    else: 
+                        reference_stack = output.get_or_set_stack_location(node.v_reference, None)
+                        output.append(
+                            f"\tmovl ${node.value.value}, {reference_stack}"
+                        )
             else:
                 output.append(
                     f"\tmovl $0, %eax",
@@ -432,8 +436,11 @@ class Ast2Asm:
                 comment="Restore the current value",
             )
         elif isinstance(node, VariableReference):
-            reference_stack = self.get_stack_variable_value(node.variable, output)
-            output.append(f"\taddl {reference_stack}, %eax")
+            if isinstance(node.variable, StructMemberAccess):
+                output.append("TODO")
+            else:
+                reference_stack = self.get_stack_variable_value(node.variable, output)
+                output.append(f"\taddl {reference_stack}, %eax")
         else:
             raise Exception(f"Unknown math op node ({node})")
 

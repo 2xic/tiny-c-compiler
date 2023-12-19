@@ -32,7 +32,8 @@ class Tokenizer:
             "&",
             "|",
             ",",
-            '"'
+            '"',
+            "."
         ]
         self.tokens = self._get_tokens(source_code)
 
@@ -326,6 +327,16 @@ class Struct(Nodes):
         super().__init__()
         self.members = []
 
+class StructMemberAccess(Nodes):
+    def __init__(self, variable_reference: VariableReference, member_name: str) -> None:
+        super().__init__()
+        self.child_nodes = [
+            variable_reference,
+            member_name,
+        ]
+        self.variable_reference = variable_reference
+        self.value = member_name 
+
 class AST:
     def __init__(self, tokens) -> None:
         self.tokens = tokens
@@ -518,6 +529,12 @@ class AST:
         else:
             token = self.tokens_index.get_token()
             if token in self.variables:
+                if self.tokens_index.is_peek_token("."):
+                    field = self.tokens_index.get_token()
+                    token = StructMemberAccess(
+                        token,
+                        field
+                    )
                 # This is an assignment ... 
                 if self.tokens_index.is_peek_token("="):
                     math_expression = self.get_math_expression()
@@ -572,7 +589,17 @@ class AST:
         elif token.isalnum() and self.tokens_index.peek_token(1) == "(":
             return self.get_function_call()
         elif token in self.variables:
-            return VariableReference(self.tokens_index.get_token())
+            token = self.tokens_index.get_token()
+            assert token in self.variables
+            if self.tokens_index.is_peek_token("."):
+                return VariableReference(
+                    StructMemberAccess(
+                        token,
+                        self.tokens_index.get_token()
+                    )
+                )            
+            else:
+                return VariableReference(token)
         elif token == "&":
             # == Memory pointer
             _ = self.tokens_index.get_token()
@@ -668,12 +695,16 @@ class AST:
                 return TypeDefinition(type_name + pointer )
             else:
                 return TypeDefinition(type_name)
+        elif self.tokens_index.peek_token() == "struct":
+            assert self.tokens_index.get_token() == "struct"
+            struct_name = self.tokens_index.get_token() 
+            return TypeDefinition("struct " + struct_name)
         return None
 
     def get_struct_definition(self):
         if self.tokens_index.peek_token() == "struct":
             assert self.tokens_index.get_token() == "struct"
-            type_name = self.tokens_index.get_token()
+            _ = self.tokens_index.get_token()
             members = self.parse_struct_members()
             assert self.tokens_index.get_token() == ";"
             return Struct(
