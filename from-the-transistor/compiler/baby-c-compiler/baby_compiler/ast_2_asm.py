@@ -258,7 +258,7 @@ class Ast2Asm:
                             if "*" in str(node.type):
                                 output.append(
                                     load_value(
-                                        Register("rbx"),
+                                        MemoryLocation(0, Register("rbx")),
                                         Register("rax"),
                                         output,
                                     ),
@@ -281,9 +281,7 @@ class Ast2Asm:
                                 ),
                                 comment="Load in the value of the rbx"
                             )                           
-                            # Rbx now needs to be loaded somewhere ? 
-                            
-                            # output.append("REAL TODO")
+                            # Rbx now needs to be loaded somewhere ?
                         else:
                             # Load the old value into eax
                             output.append(
@@ -458,9 +456,6 @@ class Ast2Asm:
                             ),
                             comment=f"Load variable ({node.value.variable}) into memory location"
                         )
-                    #print(reference_stack)
-                    # print(output.variables_stack_location)
-                    #raise Exception("This requires good logic")
                 else:
                     reference_stack = output.get_or_set_stack_location(node.v_reference, None)
                     output.append(
@@ -851,9 +846,8 @@ class Ast2Asm:
 
         if isinstance(variable, VariableDeclaration):
             variable = variable.type
-        for member_i, i in enumerate(self.ast.global_types[
-            variable.name.replace("*","").split(" ")[-1]
-        ].members):
+        name = variable.name.replace("*","").split(" ")[-1]
+        for member_i, i in enumerate(self.ast.global_types[name].members):
             if i.name == node.value:
                 index = member_i
                 break
@@ -902,7 +896,6 @@ class VariableLocation:
     @staticmethod
     def from_variable_reference(variable: str, output: AsmOutputStream):
         # Find the place in memory that the variable is store so loading is simple
-        #raise Exception("Not implemented")
         return VariableLocation(output.get_or_set_stack_location(variable, None))
 
     @staticmethod
