@@ -3,6 +3,7 @@ The AST has the ast logic.
 """
 from typing import Optional
 from .exceptions import InvalidSyntax
+from typing import Dict
 
 class Token:
     def __init__(self, value) -> None:
@@ -33,7 +34,11 @@ class Tokenizer:
             "|",
             ",",
             '"',
-            "."
+            ".",
+            "-",
+            ">",
+            "=",
+            "!"
         ]
         self.tokens = self._get_tokens(source_code)
 
@@ -138,9 +143,10 @@ class FunctionDefinition(Nodes):
         ]
 
 class ExternalFunctionDefinition(Nodes):
-    def __init__(self, name) -> None:
+    def __init__(self, name, parameters: Parameters) -> None:
         super().__init__()
         self.name = name
+        self.parameters = parameters
 
 class FunctionCall(Nodes):
     def __init__(self, function_name, parameters: Parameters) -> None:
@@ -166,10 +172,23 @@ class TokenConsumer:
         return token
 
     def is_peek_token(self, value):
-        if self.get_token() == value:
-            return True
-        self.index -= 1
-        return False
+        if type(value) == str:
+            if self.get_token() == value:
+                return True
+            self.index -= 1
+            return False
+        elif type(value) == list:
+            index = 0
+            for i in range(len(value)):
+                index += 1
+                if self.get_token() != value[i]:
+                    break
+            if index == len(value):
+                return True
+            self.index -= index
+            return False
+        else:
+            raise Exception("Unexpected token value")
     
     def peek_token(self, peek=0):
         if self.index + peek < len(self.tokens):
@@ -183,7 +202,8 @@ class File(Nodes):
     def __init__(self, name) -> None:
         super().__init__()
         self.name = name
-        self.functions = {}
+        self.functions: Dict[str, FunctionDefinition] = {}
+        self.external_functions: Dict[str, ExternalFunctionDefinition] = {}
         self.global_variables = {}
         self.global_types = {}
 
@@ -205,6 +225,15 @@ class MathOp(Nodes):
         self.child_nodes = [
             expr_1,
             expr_2
+        ]
+
+class BinaryOperation(Nodes):
+    def __init__(self, op, expr_1) -> None:
+        super().__init__()
+        self.op = op
+        self.expr_1 = expr_1
+        self.child_nodes = [
+            expr_1,
         ]
 
 class VariableAssignment(Nodes):
@@ -242,12 +271,13 @@ class StringValue(Nodes):
         ]
 
 class Conditionals(Nodes):
-    def __init__(self, if_condition, else_condition) -> None:
+    def __init__(self, if_condition, else_condition, else_if_conditions) -> None:
         super().__init__()
         self.if_condition =  if_condition
         self.else_condition = else_condition
+        self.else_if_conditions = else_if_conditions
         self.child_nodes = [
-            if_condition,
+            if_condition,] + else_if_conditions + [
             else_condition,
         ]
 
@@ -270,6 +300,14 @@ class IfCondition(Nodes):
             condition,
             body
         ]
+class ElseIfCondition(Nodes):
+    def __init__(self, condition, body) -> None:
+        super().__init__()
+        self.condition = condition
+        self.body = body
+        self.child_nodes = [
+            body
+        ]
 
 class ElseCondition(Nodes):
     def __init__(self, body) -> None:
@@ -289,6 +327,15 @@ class ConditionCheck(Nodes):
 
 
 class Equal(Nodes):
+    def __init__(self, a, b) -> None:
+        super().__init__()
+        self.a = a 
+        self.b = b
+        self.child_nodes = [
+            a, b
+        ]
+
+class NotEqual(Nodes):
     def __init__(self, a, b) -> None:
         super().__init__()
         self.a = a 
@@ -342,6 +389,33 @@ class StructMemberAccess(Nodes):
     def get_path(self):
         return self.variable_reference + "."+ self.value
 
+class StructMemberDereferenceAccess(Nodes):
+    def __init__(self, variable_reference: VariableReference, member_name: str) -> None:
+        super().__init__()
+        self.child_nodes = [
+            variable_reference,
+            member_name,
+        ]
+        self.variable_reference = variable_reference
+        self.value = member_name 
+
+    def get_path(self):
+        return self.variable_reference + "->"+ self.value
+
+class ForLoop(Nodes):
+    def __init__(self, initialization_statement, test_expression_statement, update_statement, body) -> None:
+        super().__init__()
+        self.initialization_statement = initialization_statement 
+        self.test_expression_statement = test_expression_statement
+        self.update_statement = update_statement
+        self.body =  body
+        self.child_nodes = [
+            self.initialization_statement,
+            self.test_expression_statement,
+            self.update_statement,
+            self.body
+        ]
+
 class AST:
     def __init__(self, tokens) -> None:
         self.tokens = tokens
@@ -358,11 +432,11 @@ class AST:
             "write",
             "brk"
         ]
+        self.assign_global_values = AssignGlobalValues()
 
     def build_ast(self):
         # Statements currently supported are only tokens
         self.file = File("example.c")
-        assign_global_values = AssignGlobalValues()
 
         prev_token = -1
         while prev_token !=  self.tokens_index.index and self.tokens_index.index < len(self.tokens):
@@ -376,11 +450,12 @@ class AST:
             if isinstance(file_nodes, FunctionDefinition):
                 if file_nodes.name in self.file.functions:
                     raise InvalidSyntax(f"Invalid - re-declaration of variable of {file_nodes.name}")
-                self.file.functions[file_nodes.name] = assign_global_values.assign_scope(file_nodes)
+                self.file.functions[file_nodes.name] = self.assign_global_values.assign_scope(file_nodes)
                 # Reset the variables between scopes
                 self.variables = old_variables
             elif isinstance(file_nodes, ExternalFunctionDefinition):
-                self.global_functions.append(file_nodes.name)
+                self.file.functions[file_nodes.name] = self.assign_global_values.assign_scope(file_nodes)
+                self.file.external_functions[file_nodes.name] = self.assign_global_values.assign_scope(file_nodes) # file_nodes.name
             elif isinstance(file_nodes, Struct):
                 self.file.global_types[file_nodes.name] = file_nodes
             elif isinstance(file_nodes, VariableDeclaration):
@@ -422,6 +497,7 @@ class AST:
                     assert self.tokens_index.get_token() == ";"
                     return ExternalFunctionDefinition(
                         name,
+                        parameters=parameters
                     )
                 body = self.parse_function_body()
                 if body is None:
@@ -542,6 +618,12 @@ class AST:
                         token,
                         field
                     )
+                elif self.tokens_index.is_peek_token(["-", ">"]):
+                    field = self.tokens_index.get_token()
+                    token = StructMemberDereferenceAccess(
+                        token,
+                        field
+                    )
                 # This is an assignment ... 
                 if self.tokens_index.is_peek_token("="):
                     math_expression = self.get_math_expression()
@@ -550,6 +632,11 @@ class AST:
                             token,
                             math_expression,
                         )
+                elif self.tokens_index.is_peek_token(["+", "+", ";"]):
+                    return BinaryOperation(
+                        "++",
+                        VariableReference(token)
+                    )
             elif token == "*":
                 # Dereference
                 value = self.tokens_index.get_token()
@@ -605,6 +692,13 @@ class AST:
                         self.tokens_index.get_token()
                     )
                 )            
+            elif self.tokens_index.is_peek_token(["-", ">"]):
+                return VariableReference(
+                    StructMemberDereferenceAccess(
+                        token,
+                        self.tokens_index.get_token()
+                    )
+                )    
             else:
                 return VariableReference(token)
         elif token == "&":
@@ -614,7 +708,7 @@ class AST:
             if name in self.variables:
                 return VariableAddressReference(VariableReference(name))
             else:
-                raise Exception("Unknown expression node {token}")
+                raise Exception("Unknown expression node {token}")            
         else:
             raise InvalidSyntax(f"Unknown expression node {token} - bad call ?")
         
@@ -641,18 +735,47 @@ class AST:
         # From here we can find and else or else if
         if  self.tokens_index.peek_token(0) == "(" and token == "if":
             assert self.tokens_index.get_token() == "("
+            if_condition = self.parse_if_statements(can_be_if=True)
+            else_if_conditions = []
+            else_condition = None
+            while True:
+                value = self.parse_if_statements(can_be_if=False)
+                if isinstance(value, ElseCondition):
+                    else_condition = value
+                elif isinstance(value, ElseIfCondition):
+                    else_if_conditions.append(value)
+                elif value is not None:
+                    raise Exception("Unknown condition")
+                else:
+                    break
+
             return Conditionals(
-                if_condition=self.parse_if_statements(can_be_if=True),
-                # TODO: else if 
-                else_condition=self.parse_if_statements(can_be_if=False),
+                if_condition=if_condition,
+                else_condition=else_condition,
+                else_if_conditions=else_if_conditions
             )
         elif  self.tokens_index.peek_token(0) == "(" and token == "while":
             assert self.tokens_index.get_token() == "("
+            conditional = self.get_conditional_equal()
+            assert self.tokens_index.get_token() == ")", "Bad end argument"
             return WhileConditional(
-                conditional=self.get_conditional_equal(),
+                conditional=conditional,
                 body=self.parse_function_body()
             )
-            
+        elif  self.tokens_index.peek_token(0) == "(" and token == "for":
+            assert self.tokens_index.get_token() == "("
+            initialization_statement = self.get_variable_declaration_or_assignment()
+            test_expression_statement = self.get_conditional_equal()
+            assert self.tokens_index.get_token() == ";", "Expected test statement to be terminated"
+            update_statement = self.get_update_statement()
+            assert self.tokens_index.get_token() == ")", "Expected update statement to be terminated"
+
+            return ForLoop(
+                initialization_statement=initialization_statement,
+                test_expression_statement=test_expression_statement,
+                update_statement=update_statement,
+                body=self.parse_function_body(),
+            )
 
     def parse_if_statements(self, can_be_if=False):
         if can_be_if:
@@ -664,26 +787,53 @@ class AST:
                 return ElseCondition(
                     body=self.parse_function_body()
                 )
+            elif token == "else" and self.tokens_index.peek_token(1) == "if" and self.tokens_index.peek_token(2) == "(" :
+                assert self.tokens_index.get_token() == "else"
+                assert self.tokens_index.get_token() == "if"
+                assert self.tokens_index.get_token() == "("
+                condition = self.get_conditional_equal()
+                assert self.tokens_index.get_token() == ")", "Bad end argument"
+                return ElseIfCondition(
+                    condition=condition,
+                    body=self.parse_function_body()
+                )
 
     def parse_condition_body(self):
-        equal = self.get_conditional_equal()
-        if equal is not None:
+        condition = self.get_conditional_equal()
+        if condition is not None:
+            assert self.tokens_index.get_token() == ")", "Bad end argument"
             return IfCondition(
-                condition=equal,
+                condition=condition,
                 body=self.parse_function_body()
             )
 
     def get_conditional_equal(self):
         token = self.tokens_index.get_token()
-        if self.tokens_index.get_token() == "==":
+        if self.tokens_index.is_peek_token(["=", "="]):
             if token in self.variables:
                 first_expression = VariableReference(token)
                 # Get the next token
                 numeric = self.get_numeric()
                 if not numeric is None:
                     second_expression = numeric
-                    assert self.tokens_index.get_token() == ")"
+                #    assert self.tokens_index.get_token() == ")", "Bad end argument"
                     return Equal(
+                        first_expression,
+                        second_expression
+                    )
+                else:
+                    raise Exception("Failed ")
+            else:
+                raise Exception("Not supported yet ... ")
+        elif self.tokens_index.is_peek_token(["!", "="]):
+            if token in self.variables:
+                first_expression = VariableReference(token)
+                # Get the next token
+                numeric = self.get_numeric()
+                if not numeric is None:
+                    second_expression = numeric
+                  #  assert self.tokens_index.get_token() == ")", "Bad end argument"
+                    return NotEqual(
                         first_expression,
                         second_expression
                     )
@@ -699,12 +849,15 @@ class AST:
             pointer = self.tokens_index.peek_token() == "*"
             if pointer:
                 pointer = self.tokens_index.get_token()
-                return TypeDefinition(type_name + pointer )
-            else:
-                return TypeDefinition(type_name)
+                type_name += pointer
+            return TypeDefinition(type_name)
         elif self.tokens_index.peek_token() == "struct":
             assert self.tokens_index.get_token() == "struct"
             struct_name = self.tokens_index.get_token() 
+            pointer = self.tokens_index.peek_token() == "*"
+            if pointer:
+                pointer = self.tokens_index.get_token()
+                struct_name += pointer
             return TypeDefinition("struct " + struct_name)
         return None
 
@@ -754,6 +907,18 @@ class AST:
                 return NumericValue(token)
         else:
             return None
+        
+    def get_update_statement(self):
+        """
+        TODO: Move the update of a variable assignment here
+        """
+        variable = self.tokens_index.get_token()
+        if variable in self.variables:
+            if self.tokens_index.is_peek_token(["+", "+"]):
+                return BinaryOperation(
+                    "++",
+                    VariableReference(variable)
+                )
     
     def is_valid_variable(self, name):
         return name.isidentifier()

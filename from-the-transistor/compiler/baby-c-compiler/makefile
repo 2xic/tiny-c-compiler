@@ -36,11 +36,16 @@ run_baby_compiler_tests:
 	./assert_syntax_error.sh ./reference/invalid_syntax/usage_of_undeclared_variable_scope.c "255"
 	./assert_syntax_error.sh ./reference/invalid_syntax/function_must_be_defined.c "255"
 	./assert_syntax_error.sh ./reference/invalid_syntax/variable_must_be_defined.c "255"
+	./assert_syntax_error.sh ./reference/invalid_syntax/bad_call_arguments_missing_argument.c "255"
+	./assert_syntax_error.sh ./reference/invalid_syntax/bad_call_arguments_adding_argument.c "255"
 
 	# control_flow
 	./assert.sh ./reference/control_flow/while_loops_without_else.c "10" ""
 	./assert.sh ./reference/control_flow/while_loops.c "10" ""
 	./assert.sh ./reference/control_flow/multiple_while_loops.c "22" ""
+	./assert.sh ./reference/control_flow/while_loops_not_equal.c "1" ""
+	./assert.sh ./reference/control_flow/for_loops.c "8" ""
+	./assert.sh ./reference/control_flow/multiple_for_loops.c "8" ""
 
 	# function_calls
 	./assert.sh ./reference/function_calls/function_assigment.c "9"
@@ -51,6 +56,7 @@ run_baby_compiler_tests:
 	./assert.sh ./reference/function_calls/multiple_functions.c "5"
 	./assert.sh ./reference/function_calls/multiple_sum.c "14"
 	./assert.sh ./reference/function_calls/multiple_chained_functions_calls.c "28"
+	./assert.sh ./reference/function_calls/function_else_if_scope.c "32"
 
 	# pointers
 	./assert.sh ./reference/pointers/conditionals_local_pointer.c "9"
@@ -65,6 +71,10 @@ run_baby_compiler_tests:
 	./assert.sh ./reference/scope_branches/function_if_statments_with_if_branch.c "0" "yes"
 	./assert.sh ./reference/scope_branches/function_if_statments_with_else_branch.c "3" "No"
 	./assert.sh ./reference/scope_branches/function_multiple_if_change_return_code.c "14" ""
+	./assert.sh ./reference/scope_branches/stack_variables_ret.c "2" ""
+	./assert.sh ./reference/scope_branches/if_not_function.c "6" ""
+	./assert.sh ./reference/scope_branches/if_else_if_else.c "32" ""
+	./assert.sh ./reference/scope_branches/if_many_else_if_else.c "140" ""
 
 	# syscall
 	./assert.sh ./reference/syscalls/sbrk_success.c "0"

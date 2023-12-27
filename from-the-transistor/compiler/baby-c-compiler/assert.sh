@@ -23,6 +23,7 @@ if test "$status" = "$2"
 then
     echo "Exit codes are equal"
 else
+    echo $output
     echo "Exit codes are not equal"
     echo "Expected == $2"
     echo "Got === $status"

@@ -3,8 +3,8 @@ Currently we only support very basic stuff.
 - We only support datatype `int` atm.
 - `write` - only to stdout
 - `brk` - limited heap support 
-- `if`, `else` - no `else if` yet and limited conditional checks (only equal check)
-- `while` 
+- `if`, `else if` and `else`, but with limited conditional checks (only equal check)
+- `while` and `for` loops
 - function calls + function definitions
 - single pointer (e.g `int*`) support
 

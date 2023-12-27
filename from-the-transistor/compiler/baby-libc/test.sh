@@ -12,7 +12,7 @@ if [ -z "$2" ]
 fi
 
 #gcc -o yourprogram $1 ./build/memory.o
-ld -o ./build/yourprogram -s $1 ./build/memory.o
+ld --export-dynamic  -o ./build/yourprogram -s $1 ./build/memory.o
 
 output=$(./build/yourprogram )
 status=$?
