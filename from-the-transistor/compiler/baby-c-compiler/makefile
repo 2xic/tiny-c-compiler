@@ -46,6 +46,7 @@ run_baby_compiler_tests:
 	./assert.sh ./reference/control_flow/while_loops_not_equal.c "1" ""
 	./assert.sh ./reference/control_flow/for_loops.c "8" ""
 	./assert.sh ./reference/control_flow/multiple_for_loops.c "8" ""
+	./assert.sh ./reference/control_flow/while_loop_a_outside.c "1" ""
 
 	# function_calls
 	./assert.sh ./reference/function_calls/function_assigment.c "9"
@@ -65,6 +66,7 @@ run_baby_compiler_tests:
 	./assert.sh ./reference/pointers/more_memory_pointer_tests.c "9"
 	./assert.sh ./reference/pointers/function_pointer_additional_args.c "9"
 	./assert.sh ./reference/pointers/local_variables_in_new_function_scope.c "13"
+	./assert.sh ./reference/pointers/pointer_reference.c "9"
 
 	# scope_branches
 	./assert.sh ./reference/scope_branches/local_if_new_function_scope.c "13"
@@ -75,6 +77,7 @@ run_baby_compiler_tests:
 	./assert.sh ./reference/scope_branches/if_not_function.c "6" ""
 	./assert.sh ./reference/scope_branches/if_else_if_else.c "32" ""
 	./assert.sh ./reference/scope_branches/if_many_else_if_else.c "140" ""
+	./assert.sh ./reference/scope_branches/assigment_between_scopes.c "4" ""
 
 	# syscall
 	./assert.sh ./reference/syscalls/sbrk_success.c "0"

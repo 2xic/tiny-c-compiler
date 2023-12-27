@@ -1,7 +1,7 @@
 """
 We got nice AST output, we need nice output :)
 """
-from .ast import File, FunctionDefinition, ReturnDefinition, FunctionBody, VariableDeclaration, NumericValue, MathOp, VariableAssignment, FunctionCall, VariableReference, StringValue, Conditionals, IfCondition, ElseCondition, Equal, WhileConditional, VariableAddressReference, VariableAddressDereference, StructMemberAccess, Struct, StructMemberDereferenceAccess, ExternalFunctionDefinition, NotEqual, ElseIfCondition, ForLoop, BinaryOperation
+from .ast import File, FunctionDefinition, ReturnDefinition, FunctionBody, VariableDeclaration, NumericValue, MathOp, VariableAssignment, FunctionCall, VariableReference, StringValue, Conditionals, IfCondition, ElseCondition, Equal, WhileConditional, VariableAddressReference, VariableAddressDereference, StructMemberAccess, StructMemberDereferenceAccess, ExternalFunctionDefinition, NotEqual, ElseIfCondition, ForLoop, BinaryOperation
 from .exceptions import InvalidSyntax
 import re
 
@@ -239,21 +239,13 @@ class Ast2Asm:
                                 ),
                                 comment=f"Allocate the struct variable ({node.name})"
                             )
-                            # Load the reference value
-                            reference_stack = output.get_or_set_stack_location(node.value.variable.variable_reference, None)
-                            index = self.get_struct_member_index(node.value.variable, output)
-                            output.append(
-                                load_value(
-                                    VariableLocation.from_variable_reference(node.value.variable.variable_reference, output),
-                                    Register("rbx"),
-                                    output,
-                                ),
-                                comment=f"Load variable ({node.value.variable.variable_reference}) reference into rbx"
+
+                            _ = self.get_struct_member_load(
+                                node.value.variable,
+                                "???",
+                                output
                             )
-                            # EBX has now to be loaded with the value + the index location
-                            if index != 0:
-                                #raise Exception("Need to adjust the pointer location for the size")                           
-                                output.append(f"add ${index * 8}, %rbx")
+
                             # %rbx should now contain the value ... let's reassign it 
                             if "*" in str(node.type):
                                 output.append(
@@ -287,9 +279,10 @@ class Ast2Asm:
                             output.append(
                                 load_value(
                                     VariableLocation.from_variable_reference(node.value.variable, output),
-                                    Register("eax"),
+                                    Register("rax"),
                                     output,
-                                )
+                                ),
+                                comment="Load value into rax"
                             )
                             # Store the new value from the old value 
                             output.append(
@@ -381,8 +374,9 @@ class Ast2Asm:
                 else:
                     output.append(self.create_sys_exit(node.value, output))
             else:
+                # Need to load the value for the return statement
                 if isinstance(node.value, NumericValue):
-                    output.append(load_value(node.value, Register("eax"), output))
+                    output.append(load_value(node.value, Register("rax"), output))
                 elif isinstance(node.value, MathOp):
                     self.convert_nodes(node.value, output)
                 elif isinstance(node.value, VariableReference):
@@ -422,21 +416,8 @@ class Ast2Asm:
                         comment=f"Assign to rsp offset"
                     )
                 elif isinstance(node.v_reference, StructMemberDereferenceAccess):
-                    reference_stack = output.get_or_set_stack_location(node.v_reference.variable_reference, None)
-                    index = self.get_struct_member_index(node.v_reference, output)
-                    output.append(
-                        load_value(
-                            VariableLocation.from_variable_reference(node.v_reference.variable_reference, output),
-                            Register("rbx"),
-                            output,
-                        ),
-                        comment=f"Load variable ({node.v_reference.variable_reference}) reference into rbx"
-                    )
-                    # EBX has now to be loaded with the value + the index location
-                    if index != 0:
-                        #raise Exception("Need to adjust the pointer location for the size")                           
-                        output.append(f"add ${index * 8}, %rbx")
-                    
+                    _ = self.get_struct_member_load(node.v_reference, node.value, output)
+                    # TODO: Fix this 
                     if isinstance(node.value, NumericValue):
                         output.append(
                             load_value(
@@ -449,7 +430,6 @@ class Ast2Asm:
                     else:
                         output.append(
                             load_value(
-                                #VariableLocation.from_variable_reference(node.value.variable, output),
                                 StackLocation(self.get_stack_variable_offset(node.value.variable, output)),
                                 MemoryLocation(0, Register("rbx")),
                                 output,
@@ -466,157 +446,102 @@ class Ast2Asm:
                 TODO: Refactor all of this code section
                 """
                 if isinstance(node.v_reference, StructMemberDereferenceAccess):
-                    # ebx holds the pointer of the program segment location
-                    if node.v_reference.variable_reference in output.global_variables:
-                        output.append(
-                            load_value(
-                                VariableLocation.from_global_variable(node.v_reference.variable_reference),
-                                Register("rbx"),
-                                output,
-                            ),
-                            comment=f"Load variable ({node.v_reference.variable_reference}) reference into rbx"
-                        )
-                    else:
-                        output.append(
-                            load_value(
-                                VariableLocation.from_variable_reference(node.v_reference.variable_reference, output),
-                                Register("rbx"),
-                                output,
-                            ),
-                            comment=f"Load variable ({node.v_reference.variable_reference}) reference into rbx"
-                        )
-                    # Now I need to access the value
-                    index = self.get_struct_member_index(node.v_reference, output)
-                    if index != -1:
-                        # EBX has now to be loaded with the value + the index location
-                        if index != 0:
-                            #raise Exception("Need to adjust the pointer location for the size")                           
-                            output.append(f"add ${index * 8}, %rbx")
-                        # load the variable value
-                        output.append(
-                            load_value(
-                                #VariableLocation.from_variable_reference(node.value.variable, output),
-                                StackLocation(self.get_stack_variable_offset(node.value.variable, output)),
-                                Register("rbx"),
-                                output,
-                            ),
-                            comment=f"Load variable ({node.value.variable}) into memory location of reference"
-                        )
-                    else:
-                        raise Exception("Did not find the variable location")
-                elif isinstance(node.value, VariableReference) and isinstance(node.value.variable, StructMemberDereferenceAccess):
-                    value = node.value.variable
-                    member_access = StackLocation(self.get_stack_variable_offset(node.value.variable.variable_reference, output))
-                    index = self.get_struct_member_index(
-                        node.value.variable,
-                        output
+                    _ = self.get_struct_member_load(node.v_reference, node.value.variable, output)
+                    # load the variable value
+                    output.append(
+                        load_value(
+                            StackLocation(self.get_stack_variable_offset(node.value.variable, output)),
+                            Register("rdx"),
+                            output,
+                        ),
+                        comment=f"Load variable ({node.value.variable}) into memory location of reference"
                     )
                     output.append(
                         load_value(
-                            VariableLocation.from_variable_reference(value.variable_reference, output),
-                            Register("rbx"),
+                            Register("rdx"),
+                            MemoryLocation(0, Register("rbx")),
                             output,
                         ),
-                        comment=f"Load variable ({value}) reference into rbx"
+                        comment=f"Load value into rbx offset"
                     )
-                    print(index)
-                    if index != -1:
-                        # EBX has now to be loaded with the value + the index location
-                        if index != 0:
-                            #raise Exception("Need to adjust the pointer location for the size")                           
-                            output.append(f"add ${index * 8}, %rbx")
-                        # load the variable value
-                      # output.stack_location_offset += 1
-                        output.append(
-                            f"mov %rbx, {member_access}",
-                            comment=f"Load variable ({node.value.variable}) into memory location"
-                        )
-                    else:
-                        raise Exception("Did not find the variable location")
+                elif isinstance(node.value, VariableReference) and isinstance(node.value.variable, StructMemberDereferenceAccess):
+                    member_access = self.get_struct_member_load(node.value.variable, output)
+                    output.append(
+                        f"mov %rbx, {member_access}",
+                        comment=f"Load variable ({node.value.variable}) into memory location"
+                    )
                 else:
                     output.append(
                         load_value(
-                            #VariableLocation.from_variable_reference(node.value.variable, output),
                             StackLocation(self.get_stack_variable_offset(node.value.variable, output)),
                             Register("ebx"),
                             output,
                         ),
                         comment=f"Load value({node.value.variable}) before assignment"
                     )
-                    if node.v_reference in self.ast.global_variables:
-                        output.append(
-                            load_value(
-                                Register("ebx"),
-                                VariableLocation.from_global_variable(node.v_reference),
-                                output,
-                            ),
-                            comment=f"Use loaded value for assignment ({node.v_reference})"
-                        )
-                    else:
-                        output.append(
-                            load_value(
-                                Register("ebx"),
-                                VariableLocation.from_variable_reference(node.v_reference, output),
-                                output,
-                            ),
-                            comment=f"Use loaded value for assignment ({node.v_reference})"
-                        )
+                    output.append(
+                        load_value(
+                            Register("ebx"),
+                            VariableLocation.from_variable_name(node.v_reference, self.ast, output),
+                            output,
+                        ),
+                        comment=f"Use loaded value for assignment ({node.v_reference})"
+                    )
             else:
                 output.append(
-                    f"\tmovl $0, %eax",
+                    f"\txor %rax, %rax",
                     comment="I zero out after assignment"
                 )
                 # In the case of function calls etc
                 self.convert_nodes(node.value, output)
                 reference_stack = output.get_or_set_stack_location(node.v_reference, None)
                 output.append(
-                    f"\tmovl %eax, {reference_stack}",
+                    f"\tmov %rax, {reference_stack}",
                     comment=f"Set the node result into variable {node.v_reference}"
                 )
-                # We need to zero out eax after a function call
+                # We need to zero out rax after a function call
                 output.append(
-                    f"\tmovl $0, %eax",
+                    f"\txor %rax, %rax",
                     comment="I zero out after assignment"
                 )
         elif isinstance(node, FunctionCall):
-               if node.function_name in self.built_in_functions:
-                    self.built_in_functions[node.function_name].convert(
-                        node.parameters.child_nodes,
-                        self,
-                        output
-                    )
-               else:
-                    if len(node.parameters.child_nodes) != len(self.ast.functions[node.function_name].parameters.child_nodes):
-                        raise InvalidSyntax()
+            if node.function_name in self.built_in_functions:
+                self.built_in_functions[node.function_name].convert(
+                    node.parameters.child_nodes,
+                    self,
+                    output
+                )
+            else:
+                if len(node.parameters.child_nodes) != len(self.ast.functions[node.function_name].parameters.child_nodes):
+                    raise InvalidSyntax()
 
-                    for i in node.parameters.child_nodes:
-                        if isinstance(i, NumericValue):
-                            output.append(
-                                load_value(
-                                    i,
-                                    PushLocation.argument(),
-                                    output,
-                                )
+                for i in node.parameters.child_nodes:
+                    if isinstance(i, NumericValue):
+                        output.append(
+                            load_value(
+                                i,
+                                PushLocation.argument(),
+                                output,
                             )
-                        elif isinstance(i, StringValue):
-                            print("Write strings to the RO section")
-                        elif isinstance(i, VariableReference):
-                            # You just push the variable location bro
-                            location = output.get_stack_value(i.variable)
-                            output.append(
-                                "\t"+ "pushq " + location,
-                                comment=f"Pushing pointer argument of {i.variable}"
-                            )
-                        else:
-                            raise Exception("Unknown parameter")
-                    output.append(
-                        f"\tcall {node.function_name}@PLT"
-                    )
-                    # Now we need to clear the fields ... 
-                    if len(node.parameters.child_nodes):
-                        stack = len(node.parameters.child_nodes) * 8
-                        self.reset_stack_pointer(stack, output, "Input arguments to function")
-
+                        )
+                    elif isinstance(i, StringValue):
+                        print("Write strings to the RO section")
+                    elif isinstance(i, VariableReference):
+                        # You just push the variable location bro
+                        location = output.get_stack_value(i.variable)
+                        output.append(
+                            "\t"+ "pushq " + location,
+                            comment=f"Pushing pointer argument of {i.variable}"
+                        )
+                    else:
+                        raise Exception("Unknown parameter")
+                output.append(
+                    f"\tcall {node.function_name}@PLT"
+                )
+                # Now we need to clear the fields ... 
+                if len(node.parameters.child_nodes):
+                    stack = len(node.parameters.child_nodes) * 8
+                    self.reset_stack_pointer(stack, output, "Input arguments to function")
         elif isinstance(node, Conditionals):
             # We need to save this to restore it
             copy_of_variables = dict(output.variables_stack_location)
@@ -632,8 +557,6 @@ class Ast2Asm:
             # Else if conditionals is good
             if len(node.else_if_conditions):
                 # We construct a jump condition loop
-            #    print(output.output_stream)
-            #    raise Exception("Not implemented")
                 current_id_else = node.if_condition.id
                 for i in node.else_if_conditions:
                     jne_id = "je" if isinstance(i.condition, Equal) else "jne"
@@ -666,17 +589,19 @@ class Ast2Asm:
                         f"\t{jne_id} end_of_if_{end_of_id}"
                     )
                     
-            for i in [
-                node.if_condition
-            ] + node.else_if_conditions + [
-                node.else_condition
-            ]:
+            for i in node.child_nodes:
                 if i is not None:
                     self.convert_nodes(i, output)
                     # TODO: Fix this hack
-                    if not "ret" in output.output_stream[-1]:
+                    add_jump = not "ret" in output.output_stream[-1]
+
+                    # TODO: Here we also need to reset the stack pointer ...
+                    delta = output.stack_location_offset - copy_offset
+                    self.reset_stack_pointer(delta * 8, output, "Reset after branch switch")
+                    if add_jump:
                         # we create this after the conditional node
                         output.append(f"\tjmp end_of_if_{end_of_id}")
+
                     # Then we need to jump 
                     # Then we can next condition, but not write to it yet.  
                     output.variables_stack_location = copy_of_variables
@@ -707,12 +632,21 @@ class Ast2Asm:
                 comment=f"Comparing against {node.a.variable}"
             )
         elif isinstance(node, WhileConditional):
+            copy_of_variables = dict(output.variables_stack_location)
+            copy_offset = int(output.stack_location_offset)
+
             # Need to check this and then jump ...
             output.append(f"jmp loop{node.id}")
             # Jump to the conditional
             output.append(f"cloop{node.id}:")
             # Parse the body data
             self.convert_nodes(node.body, output)
+            # Reset the stack pointer in case of local variables
+            delta = output.stack_location_offset - copy_offset
+            self.reset_stack_pointer(delta * 8, output, "Reset after branch switch")
+            # We reset it back
+            output.variables_stack_location = copy_of_variables
+            output.stack_location_offset = copy_offset        
             # define the loop start + conditional
             output.append(f"\tloop{node.id}:")
             self.convert_nodes(node.conditional, output)
@@ -852,6 +786,31 @@ class Ast2Asm:
                 index = member_i
                 break
         return index
+    """
+    Struct member accesses
+    """
+    def get_struct_member_load(self, node: StructMemberDereferenceAccess, field_name, output: AsmOutputStream):
+        variable = VariableLocation.from_variable_name(node.variable_reference, self.ast, output)
+        member_access = StackLocation(self.get_stack_variable_offset(node.variable_reference, output))
+        index = self.get_struct_member_index(
+            node,
+            output
+        )
+        output.append(
+            load_value(
+                variable,
+                Register("rbx"),
+                output,
+            ),
+            comment=f"Load variable ({field_name}) reference into rbx"
+        )
+        if index != -1:
+            if index != 0:
+                #raise Exception("Need to adjust the pointer location for the size")                           
+                output.append(f"add ${index * 8}, %rbx")
+            return member_access
+        else:
+            raise Ellipsis("Did not find the struct variable location")
 """
 One of the most common operations is moving memory with the current assembly setup.
 """
@@ -902,6 +861,13 @@ class VariableLocation:
     def from_variable_address_reference(variable: str, output: AsmOutputStream):
         # Find the place in memory that the variable is store so loading is simple
         return VariableLocation(output.get_memory_offset(variable))
+    
+    @staticmethod
+    def from_variable_name(variable: str, ast: File, output: AsmOutputStream):
+        if variable in ast.global_variables:
+            return VariableLocation.from_global_variable(variable)
+        else:
+            return VariableLocation.from_variable_reference(variable, output)
 
     def __str__(self) -> str:
         return f"{self.value}"

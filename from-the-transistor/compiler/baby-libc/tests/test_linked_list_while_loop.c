@@ -18,7 +18,7 @@ int main()
 
   // First node
   head->data = 4;
-  head->next = 0;
+  head->next = middle;
   // Next node
   middle->data = 8;
   middle->next = tail;
@@ -28,16 +28,12 @@ int main()
 
   int sum = 0;
   struct node *current = head;
-
-  int a = 0;
   
-  if (current != 0)
-  {
-    int sum_value = current->data;
-
-    sum = sum + sum_value;
-    current = current->next;
-    a++;
+  while(current != 0){
+    int value = current->data;
+    int next = current->next; 
+    current = next;
+    sum = sum + value;
   }
 
   return sum;

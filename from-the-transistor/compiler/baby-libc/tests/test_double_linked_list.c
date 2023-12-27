@@ -24,7 +24,7 @@ int main()
   struct node *next_value = head->next;
 
   int sum_a = head->data;
-  int sum_b = middle->data; // This dereference does not work.
+  int sum_b = next_value->data; // This dereference does not work.
   
   int sum = sum_a + sum_b;
 
