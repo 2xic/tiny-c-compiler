@@ -47,6 +47,7 @@ run_baby_compiler_tests:
 	./assert.sh ./reference/control_flow/for_loops.c "8" ""
 	./assert.sh ./reference/control_flow/multiple_for_loops.c "8" ""
 	./assert.sh ./reference/control_flow/while_loop_a_outside.c "1" ""
+	./assert.sh ./reference/control_flow/for_loop_a_outside.c "5" ""
 
 	# function_calls
 	./assert.sh ./reference/function_calls/function_assigment.c "9"
@@ -67,6 +68,7 @@ run_baby_compiler_tests:
 	./assert.sh ./reference/pointers/function_pointer_additional_args.c "9"
 	./assert.sh ./reference/pointers/local_variables_in_new_function_scope.c "13"
 	./assert.sh ./reference/pointers/pointer_reference.c "9"
+	#./assert.sh ./reference/pointers/struct_pointer.c "2"
 
 	# scope_branches
 	./assert.sh ./reference/scope_branches/local_if_new_function_scope.c "13"

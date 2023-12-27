@@ -239,8 +239,8 @@ class BinaryOperation(Nodes):
 class VariableAssignment(Nodes):
     def __init__(self, v_reference, v_value) -> None:
         super().__init__()
-        self.v_reference = v_reference
-        self.value = v_value
+        self.left_side = v_reference
+        self.right_side = v_value
         self.child_nodes = [
             v_reference,
             v_value
@@ -781,6 +781,7 @@ class AST:
         if can_be_if:
             return self.parse_condition_body()
         else:
+            # TODO: Convert into a is_peek_token call
             token = self.tokens_index.peek_token(0)
             if  self.tokens_index.peek_token(1) == "{" and token == "else":
                 assert self.tokens_index.get_token() == "else"
@@ -808,6 +809,7 @@ class AST:
             )
 
     def get_conditional_equal(self):
+        # TODO: This code can be shared more
         token = self.tokens_index.get_token()
         if self.tokens_index.is_peek_token(["=", "="]):
             if token in self.variables:
@@ -816,7 +818,6 @@ class AST:
                 numeric = self.get_numeric()
                 if not numeric is None:
                     second_expression = numeric
-                #    assert self.tokens_index.get_token() == ")", "Bad end argument"
                     return Equal(
                         first_expression,
                         second_expression
@@ -832,7 +833,6 @@ class AST:
                 numeric = self.get_numeric()
                 if not numeric is None:
                     second_expression = numeric
-                  #  assert self.tokens_index.get_token() == ")", "Bad end argument"
                     return NotEqual(
                         first_expression,
                         second_expression
