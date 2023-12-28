@@ -277,10 +277,21 @@ class Ast2Asm:
                             output,
                         ),
                         comment=f"Load variable ({node.right_side}) into memory location"
-                    ) 
+                    )
                 else:
                     # TODO: We allow strs in the left side, but should only use variable references.
-                    reference_stack = output.get_or_set_stack_location(node.left_side, None)
+                    reference_stack = None
+                    if isinstance(node.left_side, StructMemberAccess):
+                        variable_name = node.left_side.variable_reference + "_" + node.left_side.value
+                        if variable_name in self.ast.global_variables:
+                            reference_stack = VariableLocation.from_variable_name(
+                                variable_name,
+                                self.parameter_location,
+                                self.ast,
+                                output,
+                            )
+                    if reference_stack is None:
+                        reference_stack = output.get_or_set_stack_location(node.left_side, None)
                     output.append(
                         f"\tmovl ${node.right_side.value}, {reference_stack}"
                     )
@@ -317,14 +328,14 @@ class Ast2Asm:
                     output.append(
                         load_value(
                             StackLocation(self.parameter_location.get_stack_variable_offset(node.right_side.variable, output)),
-                            Register("ebx"),
+                            Register("rbx"),
                             output,
                         ),
                         comment=f"Load value({node.right_side.variable}) before assignment"
                     )
                     output.append(
                         load_value(
-                            Register("ebx"),
+                            Register("rbx"),
                             VariableLocation.from_variable_name(node.left_side, self.parameter_location, self.ast, output),
                             output,
                         ),
@@ -543,7 +554,19 @@ class Ast2Asm:
                 comment="Restore the current value",
             )
         elif isinstance(node, VariableReference):
-            reference_stack = self.parameter_location.get_stack_variable_value(node.variable, output)
+            # TODO: Fix the struct member access
+            variable = node.variable
+            if isinstance(variable, StructMemberAccess):
+                new_variable = variable.variable_reference + "_" + variable.value
+                if new_variable in self.ast.global_variables:
+                    variable = new_variable
+                    
+            reference_stack = VariableLocation.from_variable_name(
+                variable,
+                self.parameter_location,
+                self.ast,
+                output
+            )
             output.append(f"\taddl {reference_stack}, %eax", comment="Add the reference stack")
         else:
             raise Exception(f"Unknown math op node ({node})")
@@ -602,8 +625,8 @@ class Ast2Asm:
 
         if node.variable_reference in output.variable_2_type:
             variable = output.variable_2_type[node.variable_reference]
-        elif node.variable_reference in self.ast.global_variables:
-            variable = self.ast.global_variables[node.variable_reference]
+        elif node.variable_reference + "_" + node.value in self.ast.global_variables:
+            variable = self.ast.global_variables[node.variable_reference + "_" + node.value]
         else:
             # TODO: REmove this hardcoding
             if "a" in str(node.variable_reference):
@@ -630,7 +653,12 @@ class Ast2Asm:
         variable = VariableLocation.from_variable_name(node.variable_reference, self.parameter_location, self.ast, output)
         print("After form")
         print(output.variables_stack_location)
-        member_access = StackLocation(self.parameter_location.get_stack_variable_offset(node.variable_reference, output))
+        member_access = StackLocation(
+            VariableLocation.from_variable_name(
+                node.variable_reference, self.parameter_location, self.ast, output
+            )
+            # self.parameter_location.get_stack_variable_offset(node.variable_reference, output)
+        )
         print(output.variables_stack_location)
         index = self.get_struct_member_index(
             node,
@@ -642,7 +670,7 @@ class Ast2Asm:
                 Register("rbx"),
                 output,
             ),
-            comment=f"Load variable ({field_name}) reference into rbx"
+            comment=f"Load variable ({field_name}) reference into rbx from {member_access}"
         )
         if index != -1:
             if index != 0:
@@ -658,17 +686,21 @@ class Ast2Asm:
             # We just load the pointer
             raise Exception("huh")
         else:
-            # THis is used to create the struct member accesses.
+            # TODO: clean this up
             members = self.ast.global_types[type_name.split("struct ")[-1]]
             for i in members.members:
-                output.append(
-                    load_value(
-                        NumericValue(0),
-                        PushLocation(node.name + "." + i.name),
-                        output,
-                    ),
-                    comment="Load struct member " + str(i)
-                )
+                name = type_name.split("struct ")[-1] + "_" + i.name
+                if name in self.ast.global_variables:
+                    print(i.name, name)
+                else:
+                    output.append(
+                        load_value(
+                            NumericValue(0),
+                            PushLocation(node.name + "." + i.name),
+                            output,
+                        ),
+                        comment="Load struct member " + str(i)
+                    )
 
 """
 TODO: Move this into a more logical place

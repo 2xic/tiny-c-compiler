@@ -461,7 +461,12 @@ class AST:
             elif isinstance(file_nodes, VariableDeclaration):
                 if file_nodes.name in self.file.global_variables:
                     raise InvalidSyntax(f"Invalid - re-declaration of variable of {file_nodes.name}")
-                self.file.global_variables[file_nodes.name] = file_nodes
+                if file_nodes.type.name.split(" ")[-1] in self.file.global_types:
+                    for i in self.file.global_types[file_nodes.type.name.split(" ")[-1]].members:
+                        i.name = file_nodes.name + "_" + i.name
+                        self.file.global_variables[i.name] = i
+                else:
+                    self.file.global_variables[file_nodes.name] = file_nodes
 
         assert self.tokens_index.index == len(self.tokens),  "Failed to parse source code..."
         return self.file

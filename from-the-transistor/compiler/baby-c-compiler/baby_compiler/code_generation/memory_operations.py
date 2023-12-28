@@ -99,10 +99,11 @@ class VariableLocation:
     
     @staticmethod
     def from_variable_name(variable: str, parameter: ParameterLocation, ast: File, output: AsmOutputStream):
-        if parameter.is_variable_function_parameter(variable) != -1:
-            return VariableLocation(parameter.get_stack_variable_offset(variable, output))            
-        elif variable in ast.global_variables:
+        if variable in ast.global_variables:
             return VariableLocation.from_global_variable(variable)
+        elif parameter.is_variable_function_parameter(variable) != -1:
+            # TODO: Fix this, I don't want to pass reference here
+            return VariableLocation(parameter.get_stack_variable_offset(variable, output) + "(%rsp)")            
         else:
             return VariableLocation.from_variable_reference(variable, output)
 

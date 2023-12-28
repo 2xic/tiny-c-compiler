@@ -107,7 +107,7 @@ class AsmOutputStream:
                     break
 
         if index == -1:
-            raise Exception("Not found ")
+            raise Exception("Not found " + str(name))
 
         delta = (self.stack_location_offset - index)
         location = delta  * 8

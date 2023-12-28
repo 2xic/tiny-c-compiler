@@ -47,7 +47,7 @@ int* malloc(int size){
     } else {
         // Memory locations should be zero at this point
         // TODO: Fix this
-//        last_memory_blocks->next = test;
+        last_memory_blocks->next = test;
         last_memory_blocks = test;
     }
 
