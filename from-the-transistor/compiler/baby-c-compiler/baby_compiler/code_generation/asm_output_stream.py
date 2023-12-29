@@ -104,6 +104,8 @@ class AsmOutputStream:
             for i in self.variables_stack_location:
                 if name in f"{i}.":
                     index = self.variables_stack_location[i]
+                    #if len(self.variables_stack_location) == 3:
+                    #    index -= 1
                     break
 
         if index == -1:

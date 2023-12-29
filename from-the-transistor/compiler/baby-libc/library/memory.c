@@ -23,8 +23,17 @@ struct memory_blocks *last_memory_blocks;
 
 
 // WIP THIS section
-int* free(int* memory){
+
+// NOTE: This is the opposite from the C standard library
+int memcpy(int from_address, int to_address, int size){
+    // Copy from source destination to the target
+    // TODO: Need a pointer access nodes implemented on the AST side
+}
+
+int* free(int *value){
     // TODO: We need to find the memory section inside the memory region
+    // TODO: Wee need memcpy first http://www.danielvik.com/2010/02/fast-memcpy-in-c.html
+
     return 0;
 }
 
@@ -38,18 +47,35 @@ int* malloc(int size){
     // test = sbrk(total_size);
     
     test->size = size;
-    test->free = size;
+    // test->free = size;
     
     if (global_memory_blocks == 0){
         global_memory_blocks = test;
-        last_memory_blocks = test;
+        last_memory_blocks = test; // THIS SHOULD COPY REFERENCE ... IS IT DOING THAT ?
         return global_memory_blocks;
     } else {
         // Memory locations should be zero at this point
-        // TODO: Fix this
         last_memory_blocks->next = test;
         last_memory_blocks = test;
     }
 
     return last_memory_blocks;
+}
+
+/**
+ * DEBUG UTILS WHILE WORKING ON THIS
+*/
+int getSize(){
+    int a = 0; 
+    /*
+    struct memory_blocks *current = last_memory_blocks;
+
+    while(current != 0){
+        a++;
+        write(1, 1, "one round in the while loop\n");
+        current = current->next;
+    }
+    */
+
+    return a;
 }

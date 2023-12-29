@@ -526,12 +526,13 @@ class AST:
                     parameters.append(numeric)
                 elif self.tokens_index.peek_token() == ",":
                     self.tokens_index.get_token()
-                elif self.tokens_index.peek_token() == '"':
-                    _ = self.tokens_index.get_token()
-                    value = self.tokens_index.get_token()
-                    assert '"' == self.tokens_index.get_token(), "Expected terminator"
+                elif self.tokens_index.is_peek_token('"'):
+                    print(self.tokens_index.context())
+                    value = ""
+                    while not self.tokens_index.is_peek_token('"'):
+                        value += self.tokens_index.get_token()
                     parameters.append(StringValue(
-                        value
+                        value.replace("\\n", "\n")
                     ))
                 elif self.tokens_index.peek_token() in self.variables:
                     parameters.append(VariableReference(

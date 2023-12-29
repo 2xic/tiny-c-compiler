@@ -13,6 +13,11 @@ tests: build_shared_library
 	# Then we link and test all the files
 	./test.sh "build/test_malloc.o" "0"
 
+	# MALLOC size
+#	./compile.sh "tests/test_malloc_size.c" "build/test_malloc_size.o"
+	# Then we link and test all the files
+#	./test.sh "build/test_malloc_size.o" "2"
+
 	# SMALL LINKED LIST
 	./compile.sh "tests/test_small_linked_list.c" "build/test_small_linked_list.o"
 	# Then we link and test all the files

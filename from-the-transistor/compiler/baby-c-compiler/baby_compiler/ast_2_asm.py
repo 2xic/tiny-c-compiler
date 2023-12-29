@@ -150,7 +150,7 @@ class Ast2Asm:
                             # Load the old value into eax
                             output.append(
                                 load_value(
-                                    VariableLocation.from_variable_reference(node.value.variable, output),
+                                    VariableLocation.from_variable_name(node.value.variable, self.parameter_location, self.ast, output),
                                     Register("rax"),
                                     output,
                                 ),
@@ -171,7 +171,8 @@ class Ast2Asm:
                                 VariableLocation.from_variable_address_reference(node.value.variable.variable, output),
                                 PushLocation(node.name),
                                 output,
-                            )
+                            ),
+                            comment=f"Allocation of variable ({node.value.variable.variable})"
                         )
                     else:
                         # Store 0 to allocate
@@ -258,16 +259,28 @@ class Ast2Asm:
         elif isinstance(node, VariableAssignment):
             if isinstance(node.right_side, NumericValue):
                 if isinstance(node.left_side, VariableAddressDereference):
-                    # ASsign to the location of the variable
-                    stack_offset = self.parameter_location.get_stack_variable_offset(node.left_side.value.variable, output)
-                    # Dereference = You move memory into memory ...
-                    # This is the location of the variable pointer
-                    self.load_stack_value_to_rax(stack_offset, output)
-                    # Then we load the value
-                    output.append(
-                        f"\tmovl ${node.right_side.value}, (%rax)",
-                        comment=f"Assign to rsp offset"
-                    )
+                    """
+                    This loads in the stack offset and adjust in rax
+
+                    The dereference then loads teh value into the memory location
+                    """
+                    if node.left_side.value.variable in self.ast.global_variables:
+                        # Then we load the value
+                        output.append(
+                            f"\tmovl ${node.right_side.value}, ({node.left_side.value.variable})",
+                            comment=f"Assign to memory location of the variable"
+                        )
+                    else:
+                        # Assign to the location of the variable
+                        stack_offset = self.parameter_location.get_stack_variable_offset(node.left_side.value.variable, output)
+                        # Dereference = You move memory into memory ...
+                        # This is the location of the variable pointer
+                        self.load_stack_value_to_rax(stack_offset, output)
+                        # Then we load the value
+                        output.append(
+                            f"\tmovl ${node.right_side.value}, (%rax)",
+                            comment=f"Assign to rsp offset"
+                        )
                 elif isinstance(node.left_side, StructMemberDereferenceAccess):
                     _ = self.get_struct_member_load(node.left_side, node.right_side, output)
                     output.append(
@@ -276,7 +289,7 @@ class Ast2Asm:
                             MemoryLocation(0, Register("rbx")),
                             output,
                         ),
-                        comment=f"Load variable ({node.right_side}) into memory location"
+                        comment=f"Load variable ({node.right_side}) into memory location dereference"
                     )
                 else:
                     # TODO: We allow strs in the left side, but should only use variable references.
@@ -319,10 +332,14 @@ class Ast2Asm:
                         comment=f"Load value into rbx offset"
                     )
                 elif isinstance(node.right_side, VariableReference) and isinstance(node.right_side.variable, StructMemberDereferenceAccess):
-                    member_access = self.get_struct_member_load(node.right_side.variable, output)
+                    member_access = self.get_struct_member_load(node.right_side.variable, "???", output)
                     output.append(
-                        f"mov %rbx, {member_access}",
-                        comment=f"Load variable ({node.right_side.variable}) into memory location"
+                        f"mov (%rbx), %rdx",
+                        comment=f"Dereference value"
+                    )
+                    output.append(
+                        f"mov %rdx, {member_access}",
+                        comment=f"Load variable ({node.right_side.variable}) into memory location dereference"
                     )
                 else:
                     output.append(
@@ -577,21 +594,23 @@ class Ast2Asm:
     Input should be the calculated offset to change
     """
     def reset_stack_pointer(self, stack_offset, output: AsmOutputStream, reason: str):
-        output.append("# [start] Restore the stack pointer")
-        output.append(
-            f"\tmov %rsp, %rbx",
-            comment=f"Move the rsp because of {reason}"
-        )
-        output.append(
-            f"\tadd ${stack_offset}, %rbx",
-            comment=f"Reduce the rsp to correct offset because of {reason}"
-        )
-        output.append(
-            f"\tmov %rbx, %rsp",
-            comment=f"Move the pointer value into rbx because of {reason}"
-        )
-        output.append("# [end] Restore the stack pointer")    
-
+        if stack_offset != 0:
+            output.append("# [start] Restore the stack pointer")
+            output.append(
+                f"\tmov %rsp, %rbx",
+                comment=f"Move the rsp because of {reason}"
+            )
+            output.append(
+                f"\tadd ${stack_offset}, %rbx",
+                comment=f"Reduce the rsp to correct offset because of {reason}"
+            )
+            output.append(
+                f"\tmov %rbx, %rsp",
+                comment=f"Move the pointer value into rbx because of {reason}"
+            )
+            output.append("# [end] Restore the stack pointer")    
+        else:
+            output.append("# [No local variables - no reason to reset the stack pointer]")
     """
     Dereference the value at the given stack offset into rax
     """
@@ -612,6 +631,7 @@ class Ast2Asm:
 
     def create_sys_exit(self, exit_code, output: AsmOutputStream):
         move_value = load_value(exit_code, Register("ebx"), output)
+        # TODO: THis should use the syscall instruction instead
         return f"""
             {move_value}
             movl    $1, %eax
@@ -648,18 +668,10 @@ class Ast2Asm:
         """
         RBX 
         """
-        print("Before")
-        print(output.variables_stack_location)
         variable = VariableLocation.from_variable_name(node.variable_reference, self.parameter_location, self.ast, output)
-        print("After form")
-        print(output.variables_stack_location)
-        member_access = StackLocation(
-            VariableLocation.from_variable_name(
-                node.variable_reference, self.parameter_location, self.ast, output
-            )
-            # self.parameter_location.get_stack_variable_offset(node.variable_reference, output)
+        member_access =  VariableLocation.from_variable_name(
+            node.variable_reference, self.parameter_location, self.ast, output
         )
-        print(output.variables_stack_location)
         index = self.get_struct_member_index(
             node,
             output
@@ -674,8 +686,11 @@ class Ast2Asm:
         )
         if index != -1:
             if index != 0:
-                #raise Exception("Need to adjust the pointer location for the size")                           
-                output.append(f"add ${index * 8}, %rbx")
+                # [struct_member_1, struct_member_2]
+                    # 0xff
+                    # 0xf7
+                # We need to access the lower item
+                output.append(f"sub ${index * 8}, %rbx", comment=f"Access of {node.value} on {node.variable_reference}")
             return member_access
         else:
             raise Ellipsis("Did not find the struct variable location")
@@ -716,24 +731,24 @@ class SysWriteMapping:
         assert isinstance(parameters[2], StringValue), "Bad sys write"
         string_value = parameters[2].value
         message_id = f"message{asm_root.message_counter}"
-        output.append(
-            "\txor     %eax, %eax",
-        )
-        output.append(
-            "\txor     %ebx, %ebx",
-        )
+        # output.append(
+        #     "\txor     %eax, %eax",
+        # )
+        # output.append(
+        #     "\txor     %ebx, %ebx",
+        # )
         asm_root.message_counter += 1
         asm_root.data_sections.append(
             f"\t{message_id}:  .ascii  \"{string_value}\""
         )
         output.append(
-            "\tmov     $1, %eax",
+            "\tmov     $1, %rax",
         )
         output.append(
             "\tmov     $1, %rdi",
         )
         output.append(
-            f"\tlea     {message_id}(%rip), %rsi",
+            f"\tlea {message_id}, %rsi",
         )
         output.append(
             f"\tmov     ${len(string_value)}, %rdx"

@@ -89,10 +89,11 @@ class VariableLocation:
         if offset == -1:
             return VariableLocation("%rsp")
         else:
+            print(offset, str(variable), output.variables_stack_location)
             # TODO: Move this into another section
             output.append("", comment="[Start adjust rsp]")
             output.append("mov %rsp, %rdx")
-            output.append(f"add ${offset}, %rdx")
+            output.append(f"add ${offset}, %rdx", comment="Adjusting the pointer access")
             output.append("", comment="[end adjust rsp]")
             return VariableLocation("%rdx")
 

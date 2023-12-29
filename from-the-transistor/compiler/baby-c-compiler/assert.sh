@@ -32,7 +32,7 @@ fi
 
 if [ ! -z "$3" ]
   then
-    if test "$output" = "$3"
+    if python3 compare_output.py "$output" "$3"
     then
         echo "Output are equal"
     else
