@@ -101,11 +101,15 @@ class AsmOutputStream:
             index = self.variables_stack_location[name]
         else:
             # TODO: This is added for handling the access of the struct root member
-            for i in self.variables_stack_location:
-                if name in f"{i}.":
+            # This should find the last entry of the value ...
+            keys = list(self.variables_stack_location.keys())
+            for index, i in enumerate(keys):
+                has_next_entry = (index + 1) < len(keys)
+                get_name = lambda x: x + "."
+                if has_next_entry and get_name(name) in keys[index + 1]:
+                    continue
+                if get_name(name) in i:
                     index = self.variables_stack_location[i]
-                    #if len(self.variables_stack_location) == 3:
-                    #    index -= 1
                     break
 
         if index == -1:

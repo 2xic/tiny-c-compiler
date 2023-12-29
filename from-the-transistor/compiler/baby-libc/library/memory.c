@@ -67,7 +67,7 @@ int* malloc(int size){
 */
 int getSize(){
     int a = 0; 
-    /*
+
     struct memory_blocks *current = last_memory_blocks;
 
     while(current != 0){
@@ -75,7 +75,6 @@ int getSize(){
         write(1, 1, "one round in the while loop\n");
         current = current->next;
     }
-    */
 
     return a;
 }

@@ -189,7 +189,7 @@ class Ast2Asm:
                         self.convert_nodes(node.value, output)
                         output.append(
                             load_value(
-                                Register("eax"),
+                                Register("eax"),    # TODO: This should be rax, but for some reason the address is off.
                                 VariableLocation.from_variable_reference(node.name, output),
                                 output,
                             ),
@@ -690,7 +690,7 @@ class Ast2Asm:
                     # 0xff
                     # 0xf7
                 # We need to access the lower item
-                output.append(f"sub ${index * 8}, %rbx", comment=f"Access of {node.value} on {node.variable_reference}")
+                output.append(f"add ${index * 8}, %rbx", comment=f"Access of {node.value} on {node.variable_reference}")
             return member_access
         else:
             raise Ellipsis("Did not find the struct variable location")
@@ -703,7 +703,7 @@ class Ast2Asm:
         else:
             # TODO: clean this up
             members = self.ast.global_types[type_name.split("struct ")[-1]]
-            for i in members.members:
+            for i in list(reversed(members.members)):
                 name = type_name.split("struct ")[-1] + "_" + i.name
                 if name in self.ast.global_variables:
                     print(i.name, name)

@@ -72,8 +72,8 @@ run_baby_compiler_tests:
 	./assert.sh ./reference/pointers/global_struct_next_pointer.c "1"
 	./assert.sh ./reference/pointers/struct_pointer.c "2"
 	./assert.sh ./reference/pointers/copy_pointers.c "92"
-	./assert.sh ./reference/pointers/copy_struct_pointers.c "92"
 	./assert.sh ./reference/pointers/struct_variable_poiinter_dereference.c "8"
+	./assert.sh ./reference/pointers/copy_struct_pointers.c "92"
 
 	# scope_branches
 	./assert.sh ./reference/scope_branches/local_if_new_function_scope.c "13"

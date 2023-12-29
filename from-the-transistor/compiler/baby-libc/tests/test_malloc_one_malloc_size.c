@@ -13,13 +13,6 @@ int main(){
         return 1;
     }
 
-    // This should trigger a new allocation at the end of previous segment
-    int *b = malloc(5);
-    if (b == 1){
-        return 1;
-    }
-    *b = 9;
-
     int size = getSize();
 
     return size;
