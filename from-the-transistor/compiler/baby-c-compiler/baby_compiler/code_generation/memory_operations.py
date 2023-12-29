@@ -141,6 +141,8 @@ def load_value(value, target, output: AsmOutputStream):
             return f"pushq {str(value)}"
         elif isinstance(value, VariableLocation):
             return f"pushq {str(value)}"
+        elif isinstance(value, MemoryLocation):
+            return f"pushq {str(value)}"
         else:
             raise Exception(f"Unexpected push value {str(value)}")        
     else:

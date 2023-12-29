@@ -28,6 +28,7 @@ class Ast2Asm:
             "brk": Brk(),
         }
         self.message_counter = 2
+        self.current_function = None
 
     def get_asm(self):
         """
@@ -58,6 +59,7 @@ class Ast2Asm:
         for i in self.ast.functions:
             if i in self.ast.external_functions:
                 continue
+            self.current_function = self.ast.functions[i]
             if i != "main":
                 function_code = AsmOutputStream.defined_function(i, self.ast.global_variables)
                 self.convert_nodes(self.ast.functions[i], function_code)
@@ -89,7 +91,7 @@ class Ast2Asm:
             if node.parent is None:
                 # This is global variable so we store it in the .data section
                 self.data_sections.append(
-                    f"\t{node.name}: .long 0"
+                    f"\t{node.name}: .quad 0" # TODO: THis should likely be a long ?
                 )
                 if isinstance(node.value, NumericValue):
                     output.append(
@@ -110,6 +112,26 @@ class Ast2Asm:
                             ),
                             comment=f"{node.name} allocation"
                         )
+                    elif isinstance(node.value, VariableAddressDereference):
+                        value = node.value.value.variable
+                        #print("value ", VariableLocation.from_variable_address_reference(value, output))
+                        output.append(
+                            load_value(
+                                MemoryLocation(0, VariableLocation.from_variable_address_reference(value, output)),
+                                Register("rbx"),
+                                output,
+                            ),
+                            comment=f"Load in the variable location ({value})"
+                        )
+                        output.append(
+                            load_value(
+                                MemoryLocation(0, Register("rbx")),
+                                PushLocation(node.name),
+                                output,
+                            ),
+                            comment=f"Dereference into the value ({node.name})"
+                        )
+                        #exit(0)
                     elif isinstance(node.value, VariableReference):
                         if isinstance(node.value.variable, StructMemberDereferenceAccess):
                             # Allocate the variable
@@ -643,15 +665,26 @@ class Ast2Asm:
         # TODO: This could also contain a function parameter.
         variable = None
 
+        # TODO: This is not a good way to implement this 
         if node.variable_reference in output.variable_2_type:
             variable = output.variable_2_type[node.variable_reference]
         elif node.variable_reference + "_" + node.value in self.ast.global_variables:
             variable = self.ast.global_variables[node.variable_reference + "_" + node.value]
-        else:
-            # TODO: REmove this hardcoding
-            if "a" in str(node.variable_reference):
-                return 0
-            raise Exception("Variable not found " + str(node.variable_reference))
+        elif node.variable_reference in self.ast.global_variables:
+            variable = self.ast.global_variables[node.variable_reference]
+
+        if variable is None:
+            for i in self.current_function.parameters.child_nodes:
+                if i.name == node.variable_reference:
+                    #print(i.type)
+                    #raise Exception("FOUND IT")
+                    variable = i
+
+        if variable is None:
+            #print(self.ast.global_variables)
+            #print(str(node))
+            #print(self.current_function.parameter_lookup)
+            raise Exception("I did not find the variable reference")
 
         if isinstance(variable, VariableDeclaration):
             variable = variable.type
@@ -691,6 +724,8 @@ class Ast2Asm:
                     # 0xf7
                 # We need to access the lower item
                 output.append(f"add ${index * 8}, %rbx", comment=f"Access of {node.value} on {node.variable_reference}")
+            else:
+                output.append(f"", comment=f"Variable accessed was zero, no need to adjust the value {str(node)}")
             return member_access
         else:
             raise Ellipsis("Did not find the struct variable location")

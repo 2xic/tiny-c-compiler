@@ -126,7 +126,6 @@ class TypeDefinition(Nodes):
 class Parameters(Nodes):
     def __init__(self, parameters) -> None:
         super().__init__()
-
         self.child_nodes = parameters
 
 class FunctionDefinition(Nodes):
@@ -714,7 +713,14 @@ class AST:
             if name in self.variables:
                 return VariableAddressReference(VariableReference(name))
             else:
-                raise Exception("Unknown expression node {token}")            
+                raise Exception("Unknown expression node {token}")      
+        elif token == "*":
+            _ = self.tokens_index.get_token()
+            name = self.tokens_index.get_token()
+            if name in self.variables:
+                return VariableAddressDereference(VariableReference(name))
+            else:
+                raise Exception("Unknown dereference")
         else:
             raise InvalidSyntax(f"Unknown expression node {token} - bad call ?")
         

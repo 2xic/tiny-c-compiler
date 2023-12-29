@@ -74,6 +74,12 @@ run_baby_compiler_tests:
 	./assert.sh ./reference/pointers/copy_pointers.c "92"
 	./assert.sh ./reference/pointers/struct_variable_poiinter_dereference.c "8"
 	./assert.sh ./reference/pointers/copy_struct_pointers.c "92"
+	./assert.sh ./reference/pointers/global_reasign_pointer.c "2"
+	./assert.sh ./reference/pointers/global_dual_reasign_pointer.c "1"
+	./assert.sh ./reference/pointers/simple_linked_list.c "2"
+	./assert.sh ./reference/pointers/global_dual_dereference_reasign_pointer.c "2"
+	./assert.sh ./reference/pointers/global_dual_dereference_reasign_pointer_next.c "2"
+	./assert.sh ./reference/pointers/global_pointer_dereference.c "4"
 
 	# scope_branches
 	./assert.sh ./reference/scope_branches/local_if_new_function_scope.c "13"

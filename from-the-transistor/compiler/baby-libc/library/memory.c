@@ -38,28 +38,30 @@ int* free(int *value){
 }
 
 int* malloc(int size){
-
-    int MEMORY_BLOCK_SIZE_STRUCT = 16; // TODO: implement sizeof(struct memory_blocks);
+    int MEMORY_BLOCK_SIZE_STRUCT = 24; // TODO: implement sizeof(struct memory_blocks); Currently we allocate one variable = 8
     // We need to allocate
     int total_size = MEMORY_BLOCK_SIZE_STRUCT + size;
+
     int value_ref = sbrk(total_size);
     struct memory_blocks *test = value_ref;
-    // test = sbrk(total_size);
     
     test->size = size;
-    // test->free = size;
+    test->free = size;
+    test->next = 0;
     
     if (global_memory_blocks == 0){
         global_memory_blocks = test;
         last_memory_blocks = test; // THIS SHOULD COPY REFERENCE ... IS IT DOING THAT ?
-        return global_memory_blocks;
     } else {
         // Memory locations should be zero at this point
         last_memory_blocks->next = test;
         last_memory_blocks = test;
     }
 
-    return last_memory_blocks;
+    // Move it forward so that we don't overwrite the metadata
+    int adjustedPointer = last_memory_blocks + 24;
+
+    return adjustedPointer;
 }
 
 /**
@@ -68,11 +70,10 @@ int* malloc(int size){
 int getSize(){
     int a = 0; 
 
-    struct memory_blocks *current = last_memory_blocks;
+    struct memory_blocks *current = global_memory_blocks;
 
     while(current != 0){
         a++;
-        write(1, 1, "one round in the while loop\n");
         current = current->next;
     }
 

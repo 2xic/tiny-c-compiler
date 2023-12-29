@@ -11,7 +11,7 @@ tests: build_shared_library
 	# MALLOC
 	./compile.sh "tests/test_malloc.c" "build/test_malloc.o"
 	# Then we link and test all the files
-	./test.sh "build/test_malloc.o" "0"
+	./test.sh "build/test_malloc.o" "9"
 
 	# MALLOC linked list
 	./compile.sh "tests/test_linked_listed_broken_access.c" "build/test_linked_listed_broken_access.o"
@@ -22,6 +22,11 @@ tests: build_shared_library
 	./compile.sh "tests/test_malloc_one_malloc_size.c" "build/test_malloc_one_malloc_size.o"
 	# Then we link and test all the files
 	./test.sh "build/test_malloc_one_malloc_size.o" "1"
+
+	# MALLOC two size
+	./compile.sh "tests/test_malloc_two_malloc_size.c" "build/test_malloc_two_malloc_size.o"
+	# Then we link and test all the files
+	./test.sh "build/test_malloc_two_malloc_size.o" "2"
 
 	# SMALL LINKED LIST
 	./compile.sh "tests/test_small_linked_list.c" "build/test_small_linked_list.o"
