@@ -6,4 +6,7 @@ if sys.argv[1] != sys.argv[2]:
     print("expected", list(sys.argv[2]))
     exit(1)
 else:
+#    print("Output okay")
+#    print("output", list(sys.argv[1]))
+#    print("expected", list(sys.argv[2]))
     exit(0)

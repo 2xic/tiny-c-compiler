@@ -96,8 +96,9 @@ run_baby_compiler_tests:
 	./assert.sh ./reference/syscalls/sbrk_success.c "0"
 	./assert.sh ./reference/syscalls/sbrk_fail.c "139" # segfaults as memory is not allocated
 	./assert.sh ./reference/syscalls/function_write_syscall.c "0" "example"
-	./assert.sh ./reference/syscalls/function_write_syscall_multiple.c "0" "$(printf "0vaaaalue\n1vaaaalue222")"
-	./assert.sh ./reference/syscalls/function_write_syscall_with_space_string.c "0" "$(printf "hello world\ngoodbye world")"
+	./assert.sh ./reference/syscalls/function_write_syscall_multiple.c "0" "$$(printf "0vaaaalue\n1vaaaalue222")"
+	./assert.sh ./reference/syscalls/function_write_syscall_with_space_string.c "0" "$$(printf "hello world\ngoodbye world")"
+	./assert.sh ./reference/syscalls/function_write_syscall_long_string.c "0" "$$(printf "hello world")"
 
 	# variables 
 	./assert.sh ./reference/variables/global_variables.c "2"

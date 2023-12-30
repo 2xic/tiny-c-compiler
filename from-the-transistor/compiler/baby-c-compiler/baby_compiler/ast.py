@@ -4,94 +4,11 @@ The AST has the ast logic.
 from typing import Optional
 from .exceptions import InvalidSyntax
 from typing import Dict
+from .tokenizer import Tokenizer
 
-class Token:
-    def __init__(self, value) -> None:
-        self.value = value
-
-class ReturnToken(Token):
-    def __init__(self, value) -> None:
-        super().__init__(value)
-
-class Tokenizer:
-    def __init__(self, source_code) -> None:
-        self.break_tokens = [
-            "\n",
-            " ",
-        ]
-        self.special_symbols = [
-            "(",
-            ")",
-            "{",
-            "}",
-            ";",
-            "/",
-            "*",
-            "+",
-            "-",
-            "~",
-            "&",
-            "|",
-            ",",
-            '"',
-            ".",
-            "-",
-            ">",
-            "=",
-            "!"
-        ]
-        self.tokens = self._get_tokens(source_code)
-
-    def _get_tokens(self, source_code):
-        index = 0
-        tokens = []
-
-        token = ""
-        is_waiting_for_new_line = False
-        while index < len(source_code):
-            char = source_code[index]
-            if is_waiting_for_new_line and char != "\n":
-                index += 1
-                continue
-            elif is_waiting_for_new_line:
-                is_waiting_for_new_line = False
-            # Find symbols
-            if char == "/" and source_code[index + 1] == "/":
-                # read until \n
-                if len(token):
-                    tokens.append(token)
-                    token = ""
-                is_waiting_for_new_line = True
-                index += 1
-            elif char == "/" and source_code[index + 1] == "*":
-                # read until \n
-                if len(token):
-                    tokens.append(token)
-                    token = ""
-                while index < len(source_code):
-                    if source_code[index] == "*" and source_code[index + 1] == "/":
-                        index += 1
-                        break
-                    index += 1
-            elif char in self.special_symbols:
-                if len(token):
-                    tokens.append(token)
-                tokens.append(char)
-                token = ""
-            elif char in self.break_tokens:
-                if len(token):
-                    tokens.append(token)
-                token = ""
-            else:
-                token += char
-            index += 1
-        if len(token):
-            tokens.append(token)
-        return tokens
-    
 
 """
-So based on tokens I create outputs. 
+AST nodes helpers
 """
 
 class Nodes:
@@ -112,6 +29,24 @@ class Nodes:
     def __repr__(self) -> str:
         return self.__str__()
 
+
+class AssignGlobalValues:
+    def __init__(self) -> None:
+        self.id = 0
+
+    def assign_scope(self, node: Nodes):
+        for i in node.child_nodes:
+            # TODO: All nodes should use nodes
+            if isinstance(i, Nodes):
+                setattr(i, "id", self.id)
+                setattr(i, "parent", node)
+                self.id += 1
+                self.assign_scope(i)
+        return node
+
+"""
+AST nodes
+"""
 class ReturnDefinition(Nodes):
     def __init__(self, value) -> None:
         super().__init__()
@@ -355,20 +290,6 @@ class VariableAddressDereference(Nodes):
         self.value = value
         self.child_nodes = [value]
 
-class AssignGlobalValues:
-    def __init__(self) -> None:
-        self.id = 0
-
-    def assign_scope(self, node: Nodes):
-        for i in node.child_nodes:
-            # TODO: All nodes should use nodes
-            if isinstance(i, Nodes):
-                setattr(i, "id", self.id)
-                setattr(i, "parent", node)
-                self.id += 1
-                self.assign_scope(i)
-        return node
-
 class Struct(Nodes):
     def __init__(self, name, members) -> None:
         super().__init__()
@@ -424,7 +345,6 @@ class AST:
         }
         # Need to reconsider this... Is this how we want to create the tree?
         self.variables = {}
-        self.id = 0
         self.tokens_index = TokenConsumer(self.tokens)
         # TODO: Make this shared with the ast_2_asm logic
         self.global_functions = [
@@ -460,6 +380,7 @@ class AST:
             elif isinstance(file_nodes, VariableDeclaration):
                 if file_nodes.name in self.file.global_variables:
                     raise InvalidSyntax(f"Invalid - re-declaration of variable of {file_nodes.name}")
+                # TODO: Remove this hack
                 if file_nodes.type.name.split(" ")[-1] in self.file.global_types:
                     for i in self.file.global_types[file_nodes.type.name.split(" ")[-1]].members:
                         i.name = file_nodes.name + "_" + i.name
@@ -497,8 +418,7 @@ class AST:
                 parameters = self.get_function_definition_arguments()
                 if parameters is None:
                     return None
-                if self.tokens_index.peek_token() == ";":
-                    assert self.tokens_index.get_token() == ";"
+                if self.tokens_index.is_peek_token(";") :
                     return ExternalFunctionDefinition(
                         name,
                         parameters=parameters
@@ -823,32 +743,25 @@ class AST:
     def get_conditional_equal(self):
         # TODO: This code can be shared more
         token = self.tokens_index.get_token()
-        if self.tokens_index.is_peek_token(["=", "="]):
+        is_equal = self.tokens_index.is_peek_token(["=", "="])
+        is_not_equal = self.tokens_index.is_peek_token(["!", "="])
+        if is_equal or is_not_equal:
             if token in self.variables:
                 first_expression = VariableReference(token)
                 # Get the next token
                 numeric = self.get_numeric()
                 if not numeric is None:
                     second_expression = numeric
-                    return Equal(
-                        first_expression,
-                        second_expression
-                    )
-                else:
-                    raise Exception("Failed ")
-            else:
-                raise Exception("Not supported yet ... ")
-        elif self.tokens_index.is_peek_token(["!", "="]):
-            if token in self.variables:
-                first_expression = VariableReference(token)
-                # Get the next token
-                numeric = self.get_numeric()
-                if not numeric is None:
-                    second_expression = numeric
-                    return NotEqual(
-                        first_expression,
-                        second_expression
-                    )
+                    if is_not_equal:
+                        return NotEqual(
+                            first_expression,
+                            second_expression
+                        )
+                    else:
+                        return Equal(
+                            first_expression,
+                            second_expression
+                        )
                 else:
                     raise Exception("Failed ")
             else:
@@ -874,8 +787,7 @@ class AST:
         return None
 
     def get_struct_definition(self):
-        if self.tokens_index.peek_token() == "struct":
-            assert self.tokens_index.get_token() == "struct"
+        if self.tokens_index.is_peek_token("struct"):
             name = self.tokens_index.get_token()
             members = self.parse_struct_members()
             assert self.tokens_index.get_token() == ";"
@@ -934,4 +846,3 @@ class AST:
     
     def is_valid_variable(self, name):
         return name.isidentifier()
-

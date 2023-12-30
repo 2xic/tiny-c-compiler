@@ -38,14 +38,26 @@ class StackLocation(MemoryLocation):
 class ParameterLocation:
     def __init__(self, current_function) -> None:
         self.current_function = current_function
+        self.parameters = self.current_function.parameters.child_nodes
+        self.parameter_names = {
+            entry.name: entry for entry in self.parameters
+        }
 
-    def is_variable_function_parameter(self, variable):
+    def get_variable(self, variable):
+        location = self.get_variable_function_parameter_index(variable)
+        if location == -1:
+            return None
+        else:
+            return self.parameters[location]
+
+    def get_variable_function_parameter_index(self, variable):
         parameter_index = -1 # 
-        for index, i in enumerate(self.current_function.parameters.child_nodes):
+        for index, i in enumerate(self.parameters):
             if i.name == variable:
                 parameter_index = index
                 break
         return parameter_index
+
     """
     Get stack variable dereferenced
     """
@@ -56,7 +68,7 @@ class ParameterLocation:
     Find the variable location on the stack (both local + call arguments)
     """
     def get_stack_variable_offset(self, variable_name, output: AsmOutputStream):
-        parameter_index = self.is_variable_function_parameter(variable_name)
+        parameter_index = self.get_variable_function_parameter_index(variable_name)
 
         stack_offset = None
         if parameter_index == -1:
@@ -102,7 +114,7 @@ class VariableLocation:
     def from_variable_name(variable: str, parameter: ParameterLocation, ast: File, output: AsmOutputStream):
         if variable in ast.global_variables:
             return VariableLocation.from_global_variable(variable)
-        elif parameter.is_variable_function_parameter(variable) != -1:
+        elif parameter.get_variable_function_parameter_index(variable) != -1:
             # TODO: Fix this, I don't want to pass reference here
             return VariableLocation(parameter.get_stack_variable_offset(variable, output) + "(%rsp)")            
         else:
