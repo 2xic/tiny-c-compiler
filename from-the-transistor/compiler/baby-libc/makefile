@@ -58,6 +58,10 @@ tests: build_shared_library
 	# Then we link and test all the files
 	./test.sh "build/test_linked_list_reference.o" "4"
 
+	./compile.sh "tests/test_one_malloc_then_free.c" "build/test_one_malloc_then_free.o"
+	# Then we link and test all the files
+	./test.sh "build/test_one_malloc_then_free.o" "0"
+
 	# TEST MALLOC FREE
 	./compile.sh "tests/test_malloc_with_two_allocation_then_one_free.c" "build/test_malloc_with_two_allocation_then_one_free.o"
 	# Then we link and test all the files
@@ -73,8 +77,12 @@ tests: build_shared_library
 	# Then we link and test all the files
 	./test.sh "build/test_malloc_three_malloc_size.o" "33"
 
-#	./compile.sh "tests/test_malloc_then_free.c" "build/test_malloc_then_free.o"
+	./compile.sh "tests/test_size_of_no_malloc.c" "build/test_size_of_no_malloc.o"
 	# Then we link and test all the files
-#	./test.sh "build/test_malloc_then_free.o" "33"
+	./test.sh "build/test_size_of_no_malloc.o" "0"
+
+	./compile.sh "tests/test_malloc_then_free.c" "build/test_malloc_then_free.o"
+	# Then we link and test all the files
+	./test.sh "build/test_malloc_then_free.o" "0"
 
 	echo "Good libc"

@@ -188,11 +188,22 @@ class VariableOperations:
                             self.ast,
                             output,
                         )
+                # TODO: This is not nice at all.
                 if reference_stack is None:
-                    reference_stack = output.get_or_set_stack_location(node.left_side, None)
-                output.append(
-                    f"\tmovl ${node.right_side.value}, {reference_stack}"
-                )
+                    # reference_stack = output.get_or_set_stack_location(node.left_side, None)
+                    reference_stack = VariableLocation.from_variable_name(node.left_side, self.parameter_location, self.ast, output)
+                    if "%" in str(reference_stack):
+                        output.append(
+                            f"\tmov ${node.right_side.value}, {reference_stack}"
+                        )
+                    else:
+                        output.append(
+                            f"\tmovl ${node.right_side.value}, {reference_stack}"
+                        )
+                else:
+                    output.append(
+                        f"\tmovl ${node.right_side.value}, {reference_stack}"
+                    )
         elif isinstance(node.right_side, VariableAddressReference):
             output.append(
                 load_value(

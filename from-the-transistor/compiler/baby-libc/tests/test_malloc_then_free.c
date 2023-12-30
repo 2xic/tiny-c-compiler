@@ -28,13 +28,13 @@ int main(){
     int sizAfterFree = brk(0);
 
     int delta = sizeBeforeAllocation - sizAfterFree;
-
     int size = getSize();
 
-    if (size == 0){
+    int sum = size + delta;
+
+    if (sum == 0){
         return 0;
     } else {
-        return size;
+        return sum;
     }
 }
-

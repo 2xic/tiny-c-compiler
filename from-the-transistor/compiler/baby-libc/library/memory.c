@@ -21,7 +21,6 @@ struct memory_blocks {
 struct memory_blocks *global_memory_blocks;
 struct memory_blocks *last_memory_blocks;
 
-
 // WIP THIS section
 
 // NOTE: This is the opposite from the C standard library
@@ -38,10 +37,12 @@ int* free(int *value){
     int a = 0;
     int count = 0;
     while(a == 0){
+
         struct memory_blocks *current = prev->next;
         if (current == 0){
             a = 1;            
         } else {
+            count++;
             struct memory_blocks *current_next = current->next;
 
             if (current_next == 0){
@@ -50,28 +51,27 @@ int* free(int *value){
                 prev = prev->next;
             }
         }
-
-        count++;
     }
 
     int oldSize = prev->size;
 
     // Remove it from the list 
     prev->next = 0;
-    prev->size = 0;
     prev->free = 0;
+//    prev->size = 0; // THis messes up the stack for some reason
 
     // Let's reduce the allocation on sbrk now ...
     int MEMORY_BLOCK_SIZE_STRUCT = 24; // TODO: implement sizeof(struct memory_blocks); Currently we allocate one variable = 8
     int current_program_offset = brk(0);
     int delta = current_program_offset - MEMORY_BLOCK_SIZE_STRUCT - oldSize;
-
-    // TODO: This should also use sbrk
+    // TODO: This should also use sbrk and have it adjusted there
     int value = brk(delta);
 
-    if (count == 1){
-    //    global_memory_blocks = 0;
-        //last_memory_blocks = 0;
+
+
+    if (count == 0){
+        global_memory_blocks = 0;
+        last_memory_blocks = 0;
     }
 
     if (value == -1){
