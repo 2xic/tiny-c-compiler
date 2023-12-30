@@ -44,7 +44,7 @@ class Ast2Asm:
             self.convert_nodes(self.ast.functions["main"], main_function_output)
         else:
             main_function_output = AsmOutputStream.text_section(self.ast.global_variables)
-
+        self.data_sections += main_function_output.data_sections
         # Load global variables
         global_variables = []
         for i in self.ast.global_variables:
@@ -53,7 +53,7 @@ class Ast2Asm:
             # Insert after the init code
             # TODO: Make the output stream handle the scoep better so you just insert after _start
             main_function_output.output_stream = [main_function_output.output_stream[0], ] + function_code.output_stream + main_function_output.output_stream[1:]
-
+            self.data_sections += function_code.data_sections
         # Load the 
         other_functions = []
         for i in self.ast.functions:
@@ -63,7 +63,7 @@ class Ast2Asm:
                 function_code = AsmOutputStream.defined_function(i, self.ast.global_variables)
                 self.convert_nodes(self.ast.functions[i], function_code)
                 other_functions += function_code.output_stream
-
+                self.data_sections += function_code.data_sections
         # Need to insert one new lien at the end else the compiler is mad
         combined = global_variables + main_function_output.output_stream + other_functions + self.data_sections
         return format_asm_output(combined)
@@ -83,18 +83,6 @@ class Ast2Asm:
             self.parameter_location = ParameterLocation(node)
             self.convert_nodes(node.body, output)
         elif isinstance(node, VariableDeclaration):
-            if node.parent is None:
-                # This is global variable so we store it in the .data section
-                self.data_sections.append(
-                    f"\t{node.name}: .quad 0" # TODO: THis should likely be a long ?
-                )
-                if isinstance(node.value, NumericValue):
-                    output.append(
-                        load_value(node.value, VariableLocation(node.name), output),
-                        comment=f"{node.name} allocation"
-                    )
-                elif node.value is not None:
-                    raise Exception("Unsupported global variable value")
             failed = VariableOperations(self.ast, self.parameter_location).handle_declaration(node, output)
             if failed:                             
                 # Store 0 to allocate
@@ -106,38 +94,19 @@ class Ast2Asm:
                     ),
                     comment=f"{node.name} allocation calls"
                 )
-                output.append("xor %rax, %rax")
-                # Execute the node restore the value
-                self.convert_nodes(node.value, output)
-                output.append(
-                    load_value(
-                        Register("eax"),    # TODO: This should be rax, but for some reason the address is off.
-                        VariableLocation.from_variable_reference(node.name, output),
-                        output,
-                    ),
-                    comment="Restore the value from the converted node"
+                VariableOperations(self.ast, self.parameter_location).load_in_call_node_results(
+                    node.name,
+                    lambda: self.convert_nodes(node.value, output),
+                    output
                 )
-                # Reset the value 
-                output.append("xor %rax, %rax")
         elif isinstance(node, VariableAssignment):
             failed = VariableOperations(self.ast, self.parameter_location).handle_assignment(node, output)
             if failed:
-                output.append(
-                    f"\txor %rax, %rax",
-                    comment="I zero out after assignment"
+                VariableOperations(self.ast, self.parameter_location).load_in_call_node_results(
+                    node.left_side,
+                    lambda: self.convert_nodes(node.right_side, output),
+                    output
                 )
-                # In the case of function calls etc
-                self.convert_nodes(node.right_side, output)
-                reference_stack = output.get_or_set_stack_location(node.left_side, None)
-                output.append(
-                    f"\tmov %rax, {reference_stack}",
-                    comment=f"Set the node result into variable {node.left_side}"
-                )
-                # We need to zero out rax after a function call
-                output.append(
-                    f"\txor %rax, %rax",
-                    comment="I zero out after assignment"
-                )    
         elif isinstance(node, FunctionBody):
             for i in node.child_nodes:
                 self.convert_nodes(i, output)

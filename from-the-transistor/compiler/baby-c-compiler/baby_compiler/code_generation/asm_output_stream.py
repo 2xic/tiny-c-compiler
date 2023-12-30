@@ -12,6 +12,7 @@ class AsmOutputStream:
         self.global_variables = global_variables
         self.stack_location_offset = 0
         # We will never pop it off the stack, 
+        self.data_sections = []
 
     @staticmethod
     def main_function(global_variables):

@@ -18,7 +18,17 @@ class VariableOperations:
         if node.name in output.variables_stack_location:
             raise InvalidSyntax(f"Invalid - re-declaration of variable of {node.name}")
         if node.parent is None:
-            return None
+            # This is global variable so we store it in the .data section
+            output.data_sections.append(
+                f"\t{node.name}: .quad 0" # TODO: THis should likely be a long ?
+            )
+            if isinstance(node.value, NumericValue):
+                output.append(
+                    load_value(node.value, VariableLocation(node.name), output),
+                    comment=f"{node.name} allocation"
+                )
+            elif node.value is not None:
+                raise Exception("Unsupported global variable value")
         else:
             if not node.value is None:
                 # Else the node has to write the data to %eax at some point during the evaluation
@@ -33,7 +43,6 @@ class VariableOperations:
                     )
                 elif isinstance(node.value, VariableAddressDereference):
                     value = node.value.value.variable
-                    #print("value ", VariableLocation.from_variable_address_reference(value, output))
                     output.append(
                         load_value(
                             MemoryLocation(0, VariableLocation.from_variable_address_reference(value, output)),
@@ -50,7 +59,6 @@ class VariableOperations:
                         ),
                         comment=f"Dereference into the value ({node.name})"
                     )
-                    #exit(0)
                 elif isinstance(node.value, VariableReference):
                     if isinstance(node.value.variable, StructMemberDereferenceAccess):
                         # Allocate the variable
@@ -68,7 +76,6 @@ class VariableOperations:
                             "???",
                             output
                         )
-
                         # %rbx should now contain the value ... let's reassign it 
                         output.append(
                             load_value(
@@ -85,7 +92,7 @@ class VariableOperations:
                                 output,
                             ),
                             comment="Load in the value of the rbx"
-                        )                           
+                        )                      
                         # Rbx now needs to be loaded somewhere ?
                     else:
                         # Load the old value into eax
@@ -116,8 +123,8 @@ class VariableOperations:
                         comment=f"Allocation of variable ({node.value.variable.variable})"
                     )
                 else:
+                    # Failed as we need to load a sub node value
                     return True 
-
             elif "struct" in node.type.name:
                 StructOperations(self.ast, self.parameter_location).put_struct_members_on_stack(
                     node.type.name,
@@ -187,6 +194,15 @@ class VariableOperations:
                 output.append(
                     f"\tmovl ${node.right_side.value}, {reference_stack}"
                 )
+        elif isinstance(node.right_side, VariableAddressReference):
+            output.append(
+                load_value(
+                    VariableLocation.from_variable_address_reference(node.right_side.variable.variable, output),
+                    VariableLocation.from_variable_name(node.left_side, self.parameter_location, self.ast, output),
+                    output,
+                ),
+                comment=f"Allocation of variable ({node.right_side.variable.variable})"
+            )
         elif isinstance(node.right_side, VariableReference):
             """
             TODO: Refactor all of this code section
@@ -211,14 +227,27 @@ class VariableOperations:
                     comment=f"Load value into rbx offset"
                 )
             elif isinstance(node.right_side, VariableReference) and isinstance(node.right_side.variable, StructMemberDereferenceAccess):
-                member_access = StructOperations(self.ast, self.parameter_location).get_struct_member_load(node.right_side.variable, "???", output)
+                _ = StructOperations(self.ast, self.parameter_location).get_struct_member_load(
+                    node.right_side.variable,
+                    "???",
+                    output
+                )
+                # %rbx should now contain the value ... let's reassign it 
                 output.append(
-                    f"mov (%rbx), %rdx",
-                    comment=f"Dereference value"
+                    load_value(
+                        MemoryLocation(0, Register("rbx")),
+                        Register("rax"),
+                        output,
+                    ),
+                    comment="Temp storage to speed it all up (reference)"
                 )
                 output.append(
-                    f"mov %rdx, {member_access}",
-                    comment=f"Load variable ({node.right_side.variable}) into memory location dereference"
+                    load_value(
+                        Register("rax"),
+                        VariableLocation.from_variable_reference(node.left_side, output),
+                        output,
+                    ),
+                    comment="Load in the value of the rbx"
                 )
             else:
                 output.append(
@@ -238,7 +267,9 @@ class VariableOperations:
                     comment=f"Use loaded value for assignment ({node.left_side})"
                 )
         else:
-            return True # failed 
+            # Failed as we need to load a sub node value
+            return True 
+
     """
     Dereference the value at the given stack offset into rax
     """
@@ -256,3 +287,26 @@ class VariableOperations:
             f"\tmov (%rax), %rax",
             comment=f"Move the pointer value into rax "
         )
+
+    """
+    Call function node and load in eax
+    """
+    def load_in_call_node_results(self, variable: str, call_function, output: AsmOutputStream):
+        output.append(
+            f"\txor %rax, %rax",
+            comment="I zero out after assignment"
+        )
+        call_function()
+        output.append(
+            load_value(
+                Register("eax"),    # TODO: This should be rax, but for some reason the address is off.
+                VariableLocation.from_variable_reference(variable, output),
+                output,
+            ),
+            comment=f"Set the node result into variable {variable}"
+        )
+        # We need to zero out rax after a function call
+        output.append(
+            f"\txor %rax, %rax",
+            comment="I zero out after assignment"
+        ) 

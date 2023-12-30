@@ -106,6 +106,8 @@ run_baby_compiler_tests:
 	./assert.sh ./reference/variables/simple_increment.c "2" ""
 	./assert.sh ./reference/variables/indirect_assigment.c "2" ""
 	./assert.sh ./reference/variables/variable_assigments.c "2" ""
+	./assert.sh ./reference/variables/assigments_and_declerations.c "30" ""
+	./assert.sh ./reference/variables/assigment_to_struct_pointer.c "30" ""
 
 tests: run_baby_compiler_tests 
 	echo "Good compiler :)"
