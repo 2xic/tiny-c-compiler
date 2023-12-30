@@ -80,6 +80,9 @@ run_baby_compiler_tests:
 	./assert.sh ./reference/pointers/global_dual_dereference_reasign_pointer.c "2"
 	./assert.sh ./reference/pointers/global_dual_dereference_reasign_pointer_next.c "2"
 	./assert.sh ./reference/pointers/global_pointer_dereference.c "4"
+	./assert.sh ./reference/pointers/assign_pointer_dereference.c "84"
+	./assert.sh ./reference/pointers/struct_turtle_pointer.c "2"
+	./assert.sh ./reference/pointers/mini_malloc_free.c "1"
 
 	# scope_branches
 	./assert.sh ./reference/scope_branches/local_if_new_function_scope.c "13"
@@ -108,6 +111,10 @@ run_baby_compiler_tests:
 	./assert.sh ./reference/variables/variable_assigments.c "2" ""
 	./assert.sh ./reference/variables/assigments_and_declerations.c "30" ""
 	./assert.sh ./reference/variables/assigment_to_struct_pointer.c "30" ""
+	./assert.sh ./reference/variables/assigments_and_declerations_multiple_fields.c "74" ""
+
+	# Expressions
+	./assert.sh ./reference/expressions/minus.c "4" ""
 
 tests: run_baby_compiler_tests 
 	echo "Good compiler :)"

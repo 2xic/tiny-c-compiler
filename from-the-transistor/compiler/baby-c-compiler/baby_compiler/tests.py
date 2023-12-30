@@ -2,7 +2,8 @@
 Messy tests, lalalala
 """
 import hashlib
-from .ast import Tokenizer, AST
+from .ast import AST
+from .tokenizer import Tokenizer
 from .snapshots import Snapshot
 from .ast_2_asm import Ast2Asm
 

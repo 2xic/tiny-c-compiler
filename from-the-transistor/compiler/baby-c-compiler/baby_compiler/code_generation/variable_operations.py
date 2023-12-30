@@ -2,13 +2,13 @@
 So much of the code between the declaration and assignment of variables were duplicated instead of being shared.
 """
 from ..ast import VariableAssignment, NumericValue, VariableAddressDereference, StructMemberDereferenceAccess, StructMemberAccess, VariableReference, VariableDeclaration, VariableAddressReference
-from .memory_operations import Register, MemoryLocation, load_value, VariableLocation, StackLocation, PushLocation
+from .memory_operations import Register, MemoryLocation, load_value, VariableLocation, StackLocation, PushLocation, ParameterLocation
 from .asm_output_stream import AsmOutputStream
 from .struct_operations import StructOperations
 from ..exceptions import InvalidSyntax
 
 class VariableOperations:
-    def __init__(self, ast, parameter_location) -> None:
+    def __init__(self, ast, parameter_location: ParameterLocation) -> None:
         self.ast = ast
         self.parameter_location = parameter_location
 
@@ -30,7 +30,7 @@ class VariableOperations:
             elif node.value is not None:
                 raise Exception("Unsupported global variable value")
         else:
-            if not node.value is None:
+            if node.value is not None:
                 # Else the node has to write the data to %eax at some point during the evaluation
                 if isinstance(node.value, NumericValue):
                     output.append(
@@ -73,7 +73,6 @@ class VariableOperations:
 
                         _ = StructOperations(self.ast, self.parameter_location).get_struct_member_load(
                             node.value.variable,
-                            "???",
                             output
                         )
                         # %rbx should now contain the value ... let's reassign it 
@@ -168,7 +167,7 @@ class VariableOperations:
                         comment=f"Assign to rsp offset"
                     )
             elif isinstance(node.left_side, StructMemberDereferenceAccess):
-                _ = StructOperations(self.ast, self.parameter_location).get_struct_member_load(node.left_side, node.right_side, output)
+                _ = StructOperations(self.ast, self.parameter_location).get_struct_member_load(node.left_side, output)
                 output.append(
                     load_value(
                         node.right_side,
@@ -203,12 +202,40 @@ class VariableOperations:
                 ),
                 comment=f"Allocation of variable ({node.right_side.variable.variable})"
             )
+        elif isinstance(node.right_side, VariableAddressDereference):
+            value = node.right_side.value.variable
+            name = node.left_side
+
+            output.append(
+                load_value(
+                    MemoryLocation(0, VariableLocation.from_variable_address_reference(value, output)),
+                    Register("rbx"),
+                    output,
+                ),
+                comment=f"Load in the variable location ({value})"
+            )
+            output.append(
+                load_value(
+                    MemoryLocation(0, Register("rbx")),
+                    Register("rdx"),
+                    output,
+                ),
+                comment=f"Dereference into the value ({name})"
+            )
+            output.append(
+                load_value(
+                    Register("rdx"),
+                    VariableLocation.from_variable_name(name, self.parameter_location, self.ast, output),
+                    output,
+                ),
+                comment=f"Dereference into the value ({name})"
+            )
         elif isinstance(node.right_side, VariableReference):
             """
             TODO: Refactor all of this code section
             """
             if isinstance(node.left_side, StructMemberDereferenceAccess):
-                _ = StructOperations(self.ast, self.parameter_location).get_struct_member_load(node.left_side, node.right_side.variable, output)
+                _ = StructOperations(self.ast, self.parameter_location).get_struct_member_load(node.left_side, output)
                 # load the variable value
                 output.append(
                     load_value(
@@ -229,7 +256,6 @@ class VariableOperations:
             elif isinstance(node.right_side, VariableReference) and isinstance(node.right_side.variable, StructMemberDereferenceAccess):
                 _ = StructOperations(self.ast, self.parameter_location).get_struct_member_load(
                     node.right_side.variable,
-                    "???",
                     output
                 )
                 # %rbx should now contain the value ... let's reassign it 

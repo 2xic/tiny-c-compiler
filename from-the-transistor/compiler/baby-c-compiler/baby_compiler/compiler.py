@@ -1,5 +1,6 @@
 import sys
-from .ast import Tokenizer, AST
+from .ast import AST
+from .tokenizer import Tokenizer
 from .ast_2_asm import Ast2Asm
 from .exceptions import InvalidSyntax
 

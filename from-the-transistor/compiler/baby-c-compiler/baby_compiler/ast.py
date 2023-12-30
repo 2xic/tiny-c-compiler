@@ -4,7 +4,6 @@ The AST has the ast logic.
 from typing import Optional
 from .exceptions import InvalidSyntax
 from typing import Dict
-from .tokenizer import Tokenizer
 
 
 """
@@ -114,12 +113,12 @@ class TokenConsumer:
         elif type(value) == list:
             index = 0
             for i in range(len(value)):
-                index += 1
                 if self.get_token() != value[i]:
                     break
+                index += 1
             if index == len(value):
                 return True
-            self.index -= index
+            self.index -= index + 1
             return False
         else:
             raise Exception("Unexpected token value")
@@ -526,6 +525,8 @@ class AST:
                         )
                         self.variables[name] = value
                         return value
+                    else:
+                        raise Exception("?")
                 elif self.tokens_index.is_peek_token(";"):
                     value = VariableDeclaration(
                         type_value,
@@ -587,12 +588,22 @@ class AST:
     def get_math_expression(self):
         # How do we best evaluate this ? 
         value_1 = self.get_expression()
+        # TODO: Simplify this call
         if self.tokens_index.is_peek_token("+"):
             expr_2 = self.get_math_expression()
             if expr_2 is None:
                 return None
             return MathOp(
                 "+",
+                value_1,
+                expr_2
+            )
+        elif self.tokens_index.is_peek_token("-"):
+            expr_2 = self.get_math_expression()
+            if expr_2 is None:
+                return None
+            return MathOp(
+                "-",
                 value_1,
                 expr_2
             )

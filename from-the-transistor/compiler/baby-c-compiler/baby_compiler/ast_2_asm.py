@@ -8,6 +8,7 @@ from .code_generation.asm_output_stream import AsmOutputStream
 from .code_generation.memory_operations import load_value, PushLocation, MemoryLocation, StackLocation, VariableLocation, Register, ParameterLocation
 from .code_generation.variable_operations import VariableOperations
 from .code_generation.struct_operations import StructOperations
+from .code_generation.math_expressions_operations import MathExpressionsOperations
 
 class Ast2Asm:
     def __init__(self, ast: File) -> None:
@@ -142,8 +143,9 @@ class Ast2Asm:
             ADD immediate value to a register
             """
             # We write to EAX, but should be able to do more dynamic allocations soon
-            self.handle_math_opcodes(node.expr_1, output)
-            self.handle_math_opcodes(node.expr_2, output)
+            math_expression = MathExpressionsOperations()
+            self.handle_math_opcodes(node.expr_1, node.op, math_expression, output)
+            self.handle_math_opcodes(node.expr_2, node.op, math_expression, output)
         elif isinstance(node, BinaryOperation):
             if node.op =="++":
                 reference_stack = self.parameter_location.get_stack_variable_value(node.expr_1.variable, output)
@@ -332,17 +334,19 @@ class Ast2Asm:
         else:
             raise Exception("Unknown node " + str(node))    
     
-    def handle_math_opcodes(self, node, output: AsmOutputStream):
+    def handle_math_opcodes(self, node, operation: str, math_output: MathExpressionsOperations, output: AsmOutputStream):
+        operation = math_output.load_value(operation)
         if isinstance(node, NumericValue):
-            output.append(f"\taddl ${node.value}, %eax")
+            output.append(f"\t{operation} ${node.value}, %eax")
         elif isinstance(node, MathOp):
-            self.convert_nodes(node, output)                
+            self.handle_math_opcodes(node.expr_1, node.op, math_output, output)                
+            self.handle_math_opcodes(node.expr_2, node.op, math_output, output)                
         elif isinstance(node, FunctionCall):
             # Do a backup and then restore 
             output.append("\tmovl %eax, %edx", comment="Backup current value")
             self.convert_nodes(node, output)
             output.append(
-                f"\taddl %edx, %eax",
+                f"\t{operation} %edx, %eax",
                 comment="Restore the current value",
             )
         elif isinstance(node, VariableReference):
@@ -359,7 +363,7 @@ class Ast2Asm:
                 self.ast,
                 output
             )
-            output.append(f"\taddl {reference_stack}, %eax", comment="Add the reference stack")
+            output.append(f"\t{operation} {reference_stack}, %eax", comment="Add the reference stack")
         else:
             raise Exception(f"Unknown math op node ({node})")
 

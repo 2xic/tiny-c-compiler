@@ -13,8 +13,8 @@ int* sbrk(int increment) {
 }
 
 struct memory_blocks {
-    int size; // 4
-    int free; // 4
+    int size; // 8 (should be 4)
+    int free; // 8 (should be 4)
     struct memory_blocks *next; // 8
 };
 
@@ -33,6 +33,51 @@ int memcpy(int from_address, int to_address, int size){
 int* free(int *value){
     // TODO: We need to find the memory section inside the memory region
     // TODO: Wee need memcpy first http://www.danielvik.com/2010/02/fast-memcpy-in-c.html
+    
+    struct memory_blocks *prev = global_memory_blocks;
+    int a = 0;
+    int count = 0;
+    while(a == 0){
+        struct memory_blocks *current = prev->next;
+        if (current == 0){
+            a = 1;            
+        } else {
+            struct memory_blocks *current_next = current->next;
+
+            if (current_next == 0){
+                a = 1;
+            } else {
+                prev = prev->next;
+            }
+        }
+
+        count++;
+    }
+
+    int oldSize = prev->size;
+
+    // Remove it from the list 
+    prev->next = 0;
+    prev->size = 0;
+    prev->free = 0;
+
+    // Let's reduce the allocation on sbrk now ...
+    int MEMORY_BLOCK_SIZE_STRUCT = 24; // TODO: implement sizeof(struct memory_blocks); Currently we allocate one variable = 8
+    int current_program_offset = brk(0);
+    int delta = current_program_offset - MEMORY_BLOCK_SIZE_STRUCT - oldSize;
+
+    // TODO: This should also use sbrk
+    int value = brk(delta);
+
+    if (count == 1){
+    //    global_memory_blocks = 0;
+        //last_memory_blocks = 0;
+    }
+
+    if (value == -1){
+        return 0;
+    }
+
 
     return 0;
 }
@@ -61,6 +106,7 @@ int* malloc(int size){
     // Move it forward so that we don't overwrite the metadata
     int adjustedPointer = last_memory_blocks + 24;
 
+
     return adjustedPointer;
 }
 
@@ -74,6 +120,37 @@ int getSize(){
 
     while(current != 0){
         a++;
+        current = current->next;
+    }
+
+    return a;
+}
+
+/**
+ * I noticed that we don't correctly create the struct in memory (only the pointers)
+*/
+int sumSize(){
+    struct memory_blocks *current = global_memory_blocks;
+    
+    int a = 0;
+
+    while(current != 0){
+        int value = current->size;
+        a = a + value;
+        current = current->next;
+    }
+
+    return a;
+}
+
+int sumFree(){
+    struct memory_blocks *current = global_memory_blocks;
+    
+    int a = 0;
+
+    while(current != 0){
+        int value = current->free;
+        a = a + value;
         current = current->next;
     }
 

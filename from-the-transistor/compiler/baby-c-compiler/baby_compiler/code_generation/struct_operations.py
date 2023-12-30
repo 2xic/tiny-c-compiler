@@ -13,7 +13,7 @@ class StructOperations:
     """
     Struct member accesses
     """
-    def get_struct_member_load(self, node: StructMemberDereferenceAccess, field_name, output: AsmOutputStream):
+    def get_struct_member_load(self, node: StructMemberDereferenceAccess, output: AsmOutputStream):
         """
         RBX 
         """
@@ -31,7 +31,7 @@ class StructOperations:
                 Register("rbx"),
                 output,
             ),
-            comment=f"Load variable ({field_name}) reference into rbx from {member_access}"
+            comment=f"Load variable ({node.value}) reference into rbx from {member_access}"
         )
         if index != -1:
             if index != 0:
