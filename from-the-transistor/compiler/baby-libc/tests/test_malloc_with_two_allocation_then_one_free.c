@@ -22,7 +22,7 @@ int main(){
         return 1;
     }
 
-    free(b);
+    free(b); // This should send the value of b (the pointer value i.e 0x4000 something)
 
     int sizAfterFree = brk(0);
 

@@ -10,7 +10,6 @@ int main(){
     int *p = malloc(10);
     free(p);
 
-
     int size =  getSize();
 
     return size;

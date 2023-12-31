@@ -45,7 +45,7 @@ class VariableOperations:
                     value = node.value.value.variable
                     output.append(
                         load_value(
-                            MemoryLocation(0, VariableLocation.from_variable_address_reference(value, output)),
+                            MemoryLocation(0, VariableLocation.from_variable_address_reference(value, self.parameter_location, self.ast, output)),
                             Register("rbx"),
                             output,
                         ),
@@ -115,7 +115,7 @@ class VariableOperations:
                 elif isinstance(node.value, VariableAddressReference):
                     output.append(
                         load_value(
-                            VariableLocation.from_variable_address_reference(node.value.variable.variable, output),
+                            VariableLocation.from_variable_address_reference(node.value.variable.variable,self.parameter_location, self.ast, output),
                             PushLocation(node.name),
                             output,
                         ),
@@ -156,6 +156,7 @@ class VariableOperations:
                         comment=f"Assign to memory location of the variable"
                     )
                 else:
+                    output.append("", comment="[Start the load of variable dereference]")
                     # Assign to the location of the variable
                     stack_offset = self.parameter_location.get_stack_variable_offset(node.left_side.value.variable, output)
                     # Dereference = You move memory into memory ...
@@ -166,6 +167,7 @@ class VariableOperations:
                         f"\tmovl ${node.right_side.value}, (%rax)",
                         comment=f"Assign to rsp offset"
                     )
+                    output.append("", comment="[ENd the load of variable dereference]")
             elif isinstance(node.left_side, StructMemberDereferenceAccess):
                 _ = StructOperations(self.ast, self.parameter_location).get_struct_member_load(node.left_side, output)
                 output.append(
@@ -207,7 +209,7 @@ class VariableOperations:
         elif isinstance(node.right_side, VariableAddressReference):
             output.append(
                 load_value(
-                    VariableLocation.from_variable_address_reference(node.right_side.variable.variable, output),
+                    VariableLocation.from_variable_address_reference(node.right_side.variable.variable, self.parameter_location, self.ast, output),
                     VariableLocation.from_variable_name(node.left_side, self.parameter_location, self.ast, output),
                     output,
                 ),
@@ -226,7 +228,7 @@ class VariableOperations:
                 )
                 output.append(
                     load_value(
-                        MemoryLocation(0, VariableLocation.from_variable_address_reference(node.left_side.value.variable, output)),
+                        MemoryLocation(0, VariableLocation.from_variable_address_reference(node.left_side.value.variable,self.parameter_location, self.ast, output)),
                         Register("rax"),
                         output,
                     ),
@@ -249,7 +251,7 @@ class VariableOperations:
 
             output.append(
                 load_value(
-                    MemoryLocation(0, VariableLocation.from_variable_address_reference(value, output)),
+                    MemoryLocation(0, VariableLocation.from_variable_address_reference(value,self.parameter_location, self.ast, output)),
                     Register("rbx"),
                     output,
                 ),

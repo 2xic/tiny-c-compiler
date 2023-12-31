@@ -1,7 +1,7 @@
 """
 We got nice AST output, we need nice output :)
 """
-from .ast import File, FunctionDefinition, ReturnDefinition, FunctionBody, VariableDeclaration, NumericValue, MathOp, VariableAssignment, FunctionCall, VariableReference, StringValue, Conditionals, IfCondition, ElseCondition, Equal, WhileConditional, StructMemberAccess, ExternalFunctionDefinition, NotEqual, ElseIfCondition, ForLoop, BinaryOperation, LessThan, ConditionalType
+from .ast import File, FunctionDefinition, ReturnDefinition, FunctionBody, VariableDeclaration, NumericValue, MathOp, VariableAssignment, FunctionCall, VariableReference, StringValue, Conditionals, IfCondition, ElseCondition, WhileConditional, StructMemberAccess, ExternalFunctionDefinition, ElseIfCondition, ForLoop, BinaryOperation, ConditionalType
 from .exceptions import InvalidSyntax
 from .utils import format_asm_output
 from .code_generation.asm_output_stream import AsmOutputStream
@@ -167,6 +167,7 @@ class Ast2Asm:
                 if len_calls_arguments != len_function_definition_arguments:
                     raise InvalidSyntax()
 
+                pushed_offset = 0
                 for i in node.parameters.child_nodes:
                     if isinstance(i, NumericValue):
                         output.append(
@@ -180,11 +181,23 @@ class Ast2Asm:
                         raise Exception("Todo handle the string calls")
                     elif isinstance(i, VariableReference):
                         # You just push the variable location bro
-                        location = output.get_stack_value(i.variable)
+                        #if "*" in str(i.type):
+                        #    location = output.get_stack_value(i.variable)
+                        #    output.append(
+                        #        f"\tlea {location}, %rax",
+                        #        comment=f"Pushing pointer argument REFERENCE of {i.variable}"
+                        #    )
+                        #    output.append(
+                        #        "\t"+ "pushq %rax",
+                        #        comment=f"Pushing pointer argument REFERENCE of {i.variable}"
+                        #    )
+                        #else:
+                        location = output.get_stack_value(i.variable, pushed_offset=pushed_offset)
                         output.append(
                             "\t"+ "pushq " + location,
                             comment=f"Pushing pointer argument of {i.variable}"
                         )
+                        pushed_offset += 8
                     else:
                         raise Exception("Unknown parameter")
                 output.append(

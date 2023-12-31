@@ -105,4 +105,9 @@ tests: build_shared_library
 	# Then we link and test all the files
 	./test.sh "build/test_for_loop_iterative_memcpy_variable.o" "10"
 
+	# MEMCPY TEST
+	./compile.sh "tests/test_for_loop_memcpy_lib.c" "build/test_for_loop_memcpy_lib.o"
+	# Then we link and test all the files
+	./test.sh "build/test_for_loop_memcpy_lib.o" "10"
+
 	echo "Good libc"

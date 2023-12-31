@@ -85,6 +85,8 @@ run_baby_compiler_tests:
 	./assert.sh ./reference/pointers/assign_pointer_dereference.c "84"
 	./assert.sh ./reference/pointers/struct_turtle_pointer.c "2"
 	./assert.sh ./reference/pointers/mini_malloc_free.c "1"
+	./assert.sh ./reference/pointers/pointer_equality.c "1"
+	./assert.sh ./reference/pointers/many_pointer_function_call.c "1"
 
 	# scope_branches
 	./assert.sh ./reference/scope_branches/local_if_new_function_scope.c "13"

@@ -180,9 +180,10 @@ class VariableAssignment(Nodes):
         ]
 
 class VariableReference(Nodes):
-    def __init__(self, variable) -> None:
+    def __init__(self, variable, type) -> None:
         super().__init__()
         self.variable = variable
+        self.type = type
         self.child_nodes = [
             variable
         ]
@@ -467,8 +468,10 @@ class AST:
                         value.replace("\\n", "\n")
                     ))
                 elif self.tokens_index.peek_token() in self.variables:
+                    variable = self.tokens_index.get_token()
                     parameters.append(VariableReference(
-                        self.tokens_index.get_token()
+                        variable,
+                        self.variables[variable].type
                     ))
                 else:
                     raise Exception(f"Unknown call argument {self.tokens_index.peek_token()}")
@@ -482,14 +485,15 @@ class AST:
             while not self.tokens_index.peek_token() == ")":
                 type_value = self.get_type()
                 if type_value is not None:
-                    parameters.append(
-                        VariableDeclaration(
-                            type=type_value,
-                            name=self.tokens_index.get_token(),
-                            value=None,
-                        )
+                    variable = VariableDeclaration(
+                        type=type_value,
+                        name=self.tokens_index.get_token(),
+                        value=None,
                     )
-                    self.variables[parameters[-1].name] = True
+                    parameters.append(
+                        variable
+                    )
+                    self.variables[parameters[-1].name] = variable
                 elif self.tokens_index.peek_token() == ",":
                     self.tokens_index.get_token()
                 else:
@@ -575,17 +579,17 @@ class AST:
                 elif self.tokens_index.is_peek_token(["+", "+", ";"]):
                     return BinaryOperation(
                         "++",
-                        VariableReference(token)
+                        VariableReference(token, self.variables[token].type)
                     )
             elif token == "*":
                 # Dereference
-                value = self.tokens_index.get_token()
-                if value in self.variables:
+                variable = self.tokens_index.get_token()
+                if variable in self.variables:
                     if self.tokens_index.is_peek_token("="):
                         math_expression = self.get_math_expression()
                         if self.tokens_index.get_token() == ";" and math_expression is not None:
                             return VariableAssignment(
-                                VariableAddressDereference(VariableReference(value)),
+                                VariableAddressDereference(VariableReference(variable, self.variables[variable].type)),
                                 math_expression,                            
                             )
         return None
@@ -640,30 +644,32 @@ class AST:
                     StructMemberAccess(
                         token,
                         self.tokens_index.get_token()
-                    )
+                    ),
+                    type=self.variables[token]
                 )            
             elif self.tokens_index.is_peek_token(["-", ">"]):
                 return VariableReference(
                     StructMemberDereferenceAccess(
                         token,
                         self.tokens_index.get_token()
-                    )
+                    ),
+                    type=self.variables[token]
                 )    
             else:
-                return VariableReference(token)
+                return VariableReference(token, self.variables[token].type)
         elif token == "&":
             # == Memory pointer
             _ = self.tokens_index.get_token()
             name = self.tokens_index.get_token()
             if name in self.variables:
-                return VariableAddressReference(VariableReference(name))
+                return VariableAddressReference(VariableReference(name, self.variables[name]))
             else:
                 raise Exception("Unknown expression node {token}")      
         elif token == "*":
             _ = self.tokens_index.get_token()
             name = self.tokens_index.get_token()
             if name in self.variables:
-                return VariableAddressDereference(VariableReference(name))
+                return VariableAddressDereference(VariableReference(name, self.variables[name]))
             else:
                 raise Exception("Unknown dereference")
         else:
@@ -776,7 +782,7 @@ class AST:
         greater_than = self.tokens_index.is_peek_token(">")
         if is_equal or is_not_equal or less_than or less_than_equal or greater_than or greater_than_equal:
             if token in self.variables:
-                first_expression = VariableReference(token)
+                first_expression = VariableReference(token, self.variables[token].type)
                 # Get the next token
                 # TODO: THis should also be used for the first node.
                 numeric = self.get_expression() #self.get_numeric()
@@ -891,7 +897,7 @@ class AST:
             if self.tokens_index.is_peek_token(["+", "+"]):
                 return BinaryOperation(
                     "++",
-                    VariableReference(variable)
+                    VariableReference(variable, self.variables[variable].type)
                 )
     
     def is_valid_variable(self, name):

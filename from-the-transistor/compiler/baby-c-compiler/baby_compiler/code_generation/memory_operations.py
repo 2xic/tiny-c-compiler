@@ -74,12 +74,15 @@ class ParameterLocation:
         if parameter_index == -1:
             stack_offset = output.get_variable_offset(variable_name)
         else:
-            parameter_arguments = len(self.current_function.parameters.child_nodes) + len(output.variables_stack_location)
+            parameter_arguments = self.get_parameter_nodes(output)
             stack_offset = output.get_argument_stack_offset(
                 parameter_index,
                 parameter_arguments
             )
         return stack_offset
+    
+    def get_parameter_nodes(self, output: AsmOutputStream):
+        return len(self.current_function.parameters.child_nodes) + len(output.variables_stack_location)
 
 class VariableLocation:
     def __init__(self, value) -> None:
@@ -95,8 +98,24 @@ class VariableLocation:
         return VariableLocation(output.get_or_set_stack_location(variable, None))
 
     @staticmethod
-    def from_variable_address_reference(variable: str, output: AsmOutputStream):
-        # Find the place in memory that the variable is store so loading is simple
+    def from_variable_address_reference(variable: str, parameter: ParameterLocation, ast: File, output: AsmOutputStream):
+        # Find the memory address that the variable is store so loading is simple
+        parameter_offset = parameter.get_variable_function_parameter_index(variable)
+        # TODO: This should also be an universal api
+        if parameter_offset != -1:
+            offset = output.get_argument_stack_offset(
+                parameter_offset,
+                parameter.get_parameter_nodes(output)
+            )
+            #output.append(f"mov {value}, %rdx", comment=f"Load in the argument location")
+            #return Register("rdx")
+            # TODO: Move this into another section
+            output.append("", comment=f"[Start adjust rsp to access function parameter {variable}]")
+            output.append("mov %rsp, %rdx")
+            output.append(f"add ${offset}, %rdx", comment=f"Adjusting the pointer access at location for variable")
+            output.append("", comment="[end adjust rsp]")
+            return Register("rdx")
+
         offset = output.get_memory_offset(variable)
         if offset == -1:
             return VariableLocation("%rsp")

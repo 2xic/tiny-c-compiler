@@ -23,19 +23,19 @@ struct memory_blocks *last_memory_blocks;
 
 // WIP THIS section
 
-// NOTE: This is the opposite from the C standard library
+// NOTE: This is the opposite argument order from the C standard library
 int memcpy(int *from_address, int *to_address, int size) {
     // Copy from source destination to the target
     // TODO: Need a pointer access nodes implemented on the AST side
-
-/*    for(int v = 0; v < size; v++){
+    
+    for(int v = 0; v < size; v++){
         int value = *from_address;
         *to_address = value;
-        
+
         from_address++;
         to_address++;
     }
-*/
+
     return 0;
 }
 

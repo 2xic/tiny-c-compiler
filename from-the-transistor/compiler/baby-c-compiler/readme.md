@@ -1,9 +1,9 @@
 # Status
 Currently we only support very basic stuff. 
-- We only support datatype `int` atm.
+- We only support datatypes `int` and structs (and their pointer variants).
 - `write` - only to stdout
 - `brk` - limited heap support 
-- `if`, `else if` and `else`, but with limited conditional checks (only equal check)
+- `if`, `else if` and `else` with conditional checks (equal, less than (equal) and greater than (equal))
 - `while` and `for` loops
 - function calls + function definitions
 - single pointer (e.g `int*`) support
@@ -51,9 +51,6 @@ items before I say "okay this is good enough and been a nice project"
 - Implement `assert` ? 
 
 # Notes
-
-## Resources
-- https://www.wilfred.me.uk/blog/2014/08/27/baby-steps-to-a-c-compiler/
 
 ## Optimizations
 - Remove unreachable code
@@ -123,4 +120,15 @@ Resources
 Mostly to just get an idea of features that people commonly implement for this (most people don't fully implement c)
 
 - https://github.com/Wilfred/babyc#current-feature-set
+- https://www.wilfred.me.uk/blog/2014/08/27/baby-steps-to-a-c-compiler/
 
+## Floating points
+- https://en.wikibooks.org/wiki/X86_Assembly/Floating_Point
+- https://cs.fit.edu/~mmahoney/cse3101/float.html
+- https://students.mimuw.edu.pl/~zbyszek/asm/en/slides/float.pdf
+
+## Some resources for inspiration
+- https://en.wikipedia.org/wiki/C_data_types
+- [Iota](http://www.strudel.org.uk/itoa/)
+- [Printf](https://stackoverflow.com/a/65222964)
+- 

@@ -73,11 +73,11 @@ class AsmOutputStream:
         else:
             return f"pushq {value}"
         
-    def get_stack_value(self, name):
+    def get_stack_value(self, name, pushed_offset=0):
         if isinstance(name, StructMemberAccess):
             name = name.get_path()
         # Note: In this case we do dereference the value
-        location = self.get_variable_offset(name)
+        location = self.get_variable_offset(name) + pushed_offset
         return f"{location}(%rsp)"
         
     def get_argument_stack_offset(self, index, size):
