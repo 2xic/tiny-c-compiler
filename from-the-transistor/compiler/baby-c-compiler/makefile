@@ -49,6 +49,8 @@ run_baby_compiler_tests:
 	./assert.sh ./reference/control_flow/multiple_for_loops.c "8" ""
 	./assert.sh ./reference/control_flow/while_loop_a_outside.c "1" ""
 	./assert.sh ./reference/control_flow/for_loop_a_outside.c "5" ""
+	./assert.sh ./reference/control_flow/for_loops_while_less_than_4.c "10" ""
+	./assert.sh ./reference/control_flow/while_loops_less_than_4.c "10" ""
 
 	# function_calls
 	./assert.sh ./reference/function_calls/function_assigment.c "9"

@@ -206,15 +206,6 @@ class Ast2Asm:
             # If we have a if and else then we check for the else condition 
             if_condition = node.if_condition
             else_condition = node.else_condition
-            """"
-            Currently we do the following
-            - Jump if there is a mismatch
-            - We could turn it around by first writing the else condition and then having the jump ....
-            - What about the else if conditions ?
-                - It wouldn't change anything ... We have the jump table
-                - It would fall down to the else condition.
-                - Then jump before it if it was hit 
-            """
             # Else if conditionals is good
             if len(node.else_if_conditions):
                 # We construct a jump condition loop
@@ -231,12 +222,6 @@ class Ast2Asm:
                     f"\t{jne_id} loc_{current_id_else}",
                     comment="Else if condition jump"
                 )
-
-                #if else_condition is not None:
-                #    output.append(
-                #        f"\tjmp loc_{else_condition.id}",
-                #        comment="Else condition jump"
-                #    )
             else:
                 if else_condition is not None:
                     # ... here we could have have a else if 
@@ -284,16 +269,6 @@ class Ast2Asm:
             output.append(f"loc_{node.id}:")
             self.convert_nodes(node.body, output)
         elif isinstance(node, ConditionalType):
-#            b: NumericValue = f"${node.b}"
- #           a = ExpressionOperations(self.ast, self.parameter_location).get_expression_load(node.a, output)
-#            b = ExpressionOperations(self.ast, self.parameter_location).get_expression_load(node.b, output)
-
-            # TODO: This should be a nicer abstraction
-            #reference_stack = None
-            #if node.a.variable in output.global_variables:
-            #    reference_stack = f"{node.a.variable}"
-            #else:
-            #    reference_stack = self.parameter_location.get_stack_variable_value(node.a.variable, output)
             a = ExpressionOperations(self.ast, self.parameter_location).get_expression_load(node.a, output)
             b = ExpressionOperations(self.ast, self.parameter_location).get_expression_load(node.b, output)
             if str(a).count("%") and str(b).count("%"):
@@ -333,7 +308,7 @@ class Ast2Asm:
             output.append(f"\tloop{node.id}:")
             self.convert_nodes(node.conditional, output)
             # Jump to while loop if true
-            jne_id = "je" if isinstance(node.conditional, Equal) else "jne"
+            jne_id = get_conditional_instruction(node.conditional)
             output.append(f"{jne_id} cloop{node.id}")
         elif isinstance(node, ForLoop):
             copy_of_variables = dict(output.variables_stack_location)
@@ -359,7 +334,7 @@ class Ast2Asm:
             output.append(f"\tloop{node.id}:")
             self.convert_nodes(node.test_expression_statement, output)
             # Jump to while loop if true
-            jne_id = "je" if isinstance(node.test_expression_statement, Equal) else "jne"
+            jne_id = get_conditional_instruction(node.test_expression_statement)
             output.append(f"{jne_id} cloop{node.id}")
         elif isinstance(node, ExternalFunctionDefinition):
             pass
