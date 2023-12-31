@@ -26,7 +26,7 @@ int main(){
     free(a);
 
     int sizAfterFree = brk(0);
-
+    
     int delta = sizeBeforeAllocation - sizAfterFree;
     int size = getSize();
 

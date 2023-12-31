@@ -113,6 +113,13 @@ run_baby_compiler_tests:
 	./assert.sh ./reference/variables/assigment_to_struct_pointer.c "30" ""
 	./assert.sh ./reference/variables/assigments_and_declerations_multiple_fields.c "74" ""
 
+	# conditionals
+	./assert.sh ./reference/conditionals/less_than.c "1"
+	./assert.sh ./reference/conditionals/less_than_equal.c "1"
+	./assert.sh ./reference/conditionals/greater_than.c "0"
+	./assert.sh ./reference/conditionals/greater_than_equal.c "1"
+	./assert.sh ./reference/conditionals/greater_than_equal_variable.c "1"
+
 	# Expressions
 	./assert.sh ./reference/expressions/minus.c "4" ""
 

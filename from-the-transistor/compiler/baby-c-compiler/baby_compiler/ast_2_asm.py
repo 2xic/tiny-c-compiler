@@ -1,14 +1,15 @@
 """
 We got nice AST output, we need nice output :)
 """
-from .ast import File, FunctionDefinition, ReturnDefinition, FunctionBody, VariableDeclaration, NumericValue, MathOp, VariableAssignment, FunctionCall, VariableReference, StringValue, Conditionals, IfCondition, ElseCondition, Equal, WhileConditional, VariableAddressReference, VariableAddressDereference, StructMemberAccess, StructMemberDereferenceAccess, ExternalFunctionDefinition, NotEqual, ElseIfCondition, ForLoop, BinaryOperation
+from .ast import File, FunctionDefinition, ReturnDefinition, FunctionBody, VariableDeclaration, NumericValue, MathOp, VariableAssignment, FunctionCall, VariableReference, StringValue, Conditionals, IfCondition, ElseCondition, Equal, WhileConditional, StructMemberAccess, ExternalFunctionDefinition, NotEqual, ElseIfCondition, ForLoop, BinaryOperation, LessThan, ConditionalType
 from .exceptions import InvalidSyntax
 from .utils import format_asm_output
 from .code_generation.asm_output_stream import AsmOutputStream
-from .code_generation.memory_operations import load_value, PushLocation, MemoryLocation, StackLocation, VariableLocation, Register, ParameterLocation
+from .code_generation.memory_operations import load_value, PushLocation, VariableLocation, Register, ParameterLocation
 from .code_generation.variable_operations import VariableOperations
-from .code_generation.struct_operations import StructOperations
 from .code_generation.math_expressions_operations import MathExpressionsOperations
+from .code_generation.conditionals_operations import get_conditional_instruction
+from .code_generation.expression_operations import ExpressionOperations
 
 class Ast2Asm:
     def __init__(self, ast: File) -> None:
@@ -197,19 +198,29 @@ class Ast2Asm:
             copy_of_variables = dict(output.variables_stack_location)
             copy_offset = int(output.stack_location_offset)
             # setup the conditional logic
-            self.convert_nodes(node.if_condition.condition, output)
+            self.convert_nodes(node.if_condition.condition, output) # This should then 
             # Use the id for the condition
             end_of_id = node.id
             # What we do in this case is to skip the region if not equal.
-            jne_id = "jne" if isinstance(node.if_condition.condition, Equal) else "je"
+            jne_id = get_conditional_instruction(node.if_condition.condition)
             # If we have a if and else then we check for the else condition 
+            if_condition = node.if_condition
             else_condition = node.else_condition
+            """"
+            Currently we do the following
+            - Jump if there is a mismatch
+            - We could turn it around by first writing the else condition and then having the jump ....
+            - What about the else if conditions ?
+                - It wouldn't change anything ... We have the jump table
+                - It would fall down to the else condition.
+                - Then jump before it if it was hit 
+            """
             # Else if conditionals is good
             if len(node.else_if_conditions):
                 # We construct a jump condition loop
                 current_id_else = node.if_condition.id
                 for i in node.else_if_conditions:
-                    jne_id = "je" if isinstance(i.condition, Equal) else "jne"
+                    jne_id = get_conditional_instruction(i.condition)
                     output.append(
                         f"\t{jne_id} loc_{current_id_else}",
                         comment="Jump location"
@@ -221,25 +232,28 @@ class Ast2Asm:
                     comment="Else if condition jump"
                 )
 
-                if else_condition is not None:
-                    output.append(
-                        f"\tjmp loc_{else_condition.id}",
-                        comment="Else condition jump"
-                    )
+                #if else_condition is not None:
+                #    output.append(
+                #        f"\tjmp loc_{else_condition.id}",
+                #        comment="Else condition jump"
+                #    )
             else:
                 if else_condition is not None:
                     # ... here we could have have a else if 
                     output.append(
-                        f"\t{jne_id} loc_{else_condition.id}",
-                        comment="Else condition jump"
+                        f"\t{jne_id} loc_{if_condition.id}",
+                        comment="If condition jump"
                     )
                 else:
                     # We just check for the if conditional
                     output.append(
-                        f"\t{jne_id} end_of_if_{end_of_id}"
+                        f"\t{jne_id} loc_{if_condition.id}",
+                    )
+                    output.append(
+                        f"\tjmp end_of_if_{end_of_id}"
                     )
                     
-            for i in node.child_nodes:
+            for i in [node.else_condition, node.if_condition] + node.else_if_conditions:
                 if i is not None:
                     self.convert_nodes(i, output)
                     # TODO: Fix this hack
@@ -269,18 +283,36 @@ class Ast2Asm:
         elif isinstance(node, ElseCondition):
             output.append(f"loc_{node.id}:")
             self.convert_nodes(node.body, output)
-        elif isinstance(node, Equal) or isinstance(node, NotEqual):
+        elif isinstance(node, ConditionalType):
+#            b: NumericValue = f"${node.b}"
+ #           a = ExpressionOperations(self.ast, self.parameter_location).get_expression_load(node.a, output)
+#            b = ExpressionOperations(self.ast, self.parameter_location).get_expression_load(node.b, output)
+
             # TODO: This should be a nicer abstraction
-            reference_stack = None
-            if node.a.variable in output.global_variables:
-                reference_stack = f"{node.a.variable}"
+            #reference_stack = None
+            #if node.a.variable in output.global_variables:
+            #    reference_stack = f"{node.a.variable}"
+            #else:
+            #    reference_stack = self.parameter_location.get_stack_variable_value(node.a.variable, output)
+            a = ExpressionOperations(self.ast, self.parameter_location).get_expression_load(node.a, output)
+            b = ExpressionOperations(self.ast, self.parameter_location).get_expression_load(node.b, output)
+            if str(a).count("%") and str(b).count("%"):
+                output.append(
+                    load_value(
+                        a,
+                        Register("rdx"),
+                        output,
+                    )
+                )
+                output.append(
+                    f"\tcmp {b}, %rdx",
+                    comment=f"Comparing against {node.a.variable}"
+                )
             else:
-                reference_stack = self.parameter_location.get_stack_variable_value(node.a.variable, output)
-            b: NumericValue = node.b
-            output.append(
-                f"\tcmpl ${b.value}, {reference_stack}",
-                comment=f"Comparing against {node.a.variable}"
-            )
+                output.append(
+                    f"\tcmpl {b}, {a}",
+                    comment=f"Comparing against {node.a.variable}"
+                )
         elif isinstance(node, WhileConditional):
             copy_of_variables = dict(output.variables_stack_location)
             copy_offset = int(output.stack_location_offset)

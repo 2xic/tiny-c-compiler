@@ -258,8 +258,7 @@ class ConditionCheck(Nodes):
             value
         ]
 
-
-class Equal(Nodes):
+class ConditionalType(Nodes):
     def __init__(self, a, b) -> None:
         super().__init__()
         self.a = a 
@@ -268,14 +267,29 @@ class Equal(Nodes):
             a, b
         ]
 
-class NotEqual(Nodes):
+class Equal(ConditionalType):
     def __init__(self, a, b) -> None:
-        super().__init__()
-        self.a = a 
-        self.b = b
-        self.child_nodes = [
-            a, b
-        ]
+        super().__init__(a, b)
+
+class NotEqual(ConditionalType):
+    def __init__(self, a, b) -> None:
+        super().__init__(a, b)
+
+class LessThan(ConditionalType):
+    def __init__(self, a, b) -> None:
+        super().__init__(a, b)
+
+class LessThanEqual(ConditionalType):
+    def __init__(self, a, b) -> None:
+        super().__init__(a, b)
+
+class GreaterThan(ConditionalType):
+    def __init__(self, a, b) -> None:
+        super().__init__(a, b)
+
+class GreaterThanEqual(ConditionalType):
+    def __init__(self, a, b) -> None:
+        super().__init__(a, b)
 
 class VariableAddressReference(Nodes):
     def __init__(self, variable) -> None:
@@ -756,15 +770,40 @@ class AST:
         token = self.tokens_index.get_token()
         is_equal = self.tokens_index.is_peek_token(["=", "="])
         is_not_equal = self.tokens_index.is_peek_token(["!", "="])
-        if is_equal or is_not_equal:
+        less_than_equal = self.tokens_index.is_peek_token(["<", "="])
+        less_than = self.tokens_index.is_peek_token("<")
+        greater_than_equal = self.tokens_index.is_peek_token([">", "="])
+        greater_than = self.tokens_index.is_peek_token(">")
+        if is_equal or is_not_equal or less_than or less_than_equal or greater_than or greater_than_equal:
             if token in self.variables:
                 first_expression = VariableReference(token)
                 # Get the next token
-                numeric = self.get_numeric()
+                # TODO: THis should also be used for the first node.
+                numeric = self.get_expression() #self.get_numeric()
                 if not numeric is None:
                     second_expression = numeric
                     if is_not_equal:
                         return NotEqual(
+                            first_expression,
+                            second_expression
+                        )
+                    elif less_than:
+                        return LessThan(
+                            first_expression,
+                            second_expression
+                        )
+                    elif less_than_equal:
+                        return LessThanEqual(
+                            first_expression,
+                            second_expression
+                        )
+                    elif greater_than_equal:
+                        return GreaterThanEqual(
+                            first_expression,
+                            second_expression
+                        )
+                    elif greater_than:
+                        return GreaterThan(
                             first_expression,
                             second_expression
                         )

@@ -13,8 +13,8 @@ int* sbrk(int increment) {
 }
 
 struct memory_blocks {
-    int size; // 8 (should be 4)
     int free; // 8 (should be 4)
+    int size; // 8 (should be 4)
     struct memory_blocks *next; // 8
 };
 
@@ -34,40 +34,41 @@ int* free(int *value){
     // TODO: Wee need memcpy first http://www.danielvik.com/2010/02/fast-memcpy-in-c.html
     
     struct memory_blocks *prev = global_memory_blocks;
-    int a = 0;
+    int run = 0;
     int count = 0;
-    while(a == 0){
+    while(run == 0){
 
         struct memory_blocks *current = prev->next;
         if (current == 0){
-            a = 1;            
+            run = 1;            
         } else {
             count++;
             struct memory_blocks *current_next = current->next;
 
             if (current_next == 0){
-                a = 1;
+                run = 1;
             } else {
                 prev = prev->next;
             }
         }
     }
 
+    /*
+    * TODO: Implement less than equal check here so we only readjust the segment size if the malloc is fully used.
+    */
+
     int oldSize = prev->size;
-
-    // Remove it from the list 
-    prev->next = 0;
-    prev->free = 0;
-//    prev->size = 0; // THis messes up the stack for some reason
-
     // Let's reduce the allocation on sbrk now ...
     int MEMORY_BLOCK_SIZE_STRUCT = 24; // TODO: implement sizeof(struct memory_blocks); Currently we allocate one variable = 8
     int current_program_offset = brk(0);
     int delta = current_program_offset - MEMORY_BLOCK_SIZE_STRUCT - oldSize;
+
+    // Remove it from the list 
+    prev->next = 0;
+
+
     // TODO: This should also use sbrk and have it adjusted there
     int value = brk(delta);
-
-
 
     if (count == 0){
         global_memory_blocks = 0;
