@@ -99,15 +99,17 @@ class AsmOutputStream:
             name = name.get_path()
         
         if name in self.variables_stack_location:
+            #print(f"Used variable stack location for position ({name})")
             index = self.variables_stack_location[name]
         else:
+            #print(f"Tried to find variable ({name})", self.variables_stack_location)
             # TODO: This is added for handling the access of the struct root member
             # This should find the last entry of the value ...
             keys = list(self.variables_stack_location.keys())
-            for index, i in enumerate(keys):
-                has_next_entry = (index + 1) < len(keys)
+            for key_index, i in enumerate(keys):
+                has_next_entry = (key_index + 1) < len(keys)
                 get_name = lambda x: x + "."
-                if has_next_entry and get_name(name) in keys[index + 1]:
+                if has_next_entry and get_name(name) in keys[key_index + 1]:
                     continue
                 if get_name(name) in i:
                     index = self.variables_stack_location[i]

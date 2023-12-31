@@ -75,7 +75,7 @@ tests: build_shared_library
 	# TEST MALLOC SIZE
 	./compile.sh "tests/test_malloc_three_malloc_size.c" "build/test_malloc_three_malloc_size.o"
 	# Then we link and test all the files
-	./test.sh "build/test_malloc_three_malloc_size.o" "33"
+	./test.sh "build/test_malloc_three_malloc_size.o" "18"
 
 	./compile.sh "tests/test_size_of_no_malloc.c" "build/test_size_of_no_malloc.o"
 	# Then we link and test all the files
@@ -84,5 +84,25 @@ tests: build_shared_library
 	./compile.sh "tests/test_malloc_then_free.c" "build/test_malloc_then_free.o"
 	# Then we link and test all the files
 	./test.sh "build/test_malloc_then_free.o" "0"
+
+	# TODO: FIx this test
+#	./compile.sh "tests/test_malloc_free_a_before_b.c" "build/test_malloc_free_a_before_b.o"
+	# Then we link and test all the files
+#	./test.sh "build/test_malloc_free_a_before_b.o" "9"
+
+	# MEMCPY TEST
+	./compile.sh "tests/test_iterative_memcpy.c" "build/test_iterative_memcpy.o"
+	# Then we link and test all the files
+	./test.sh "build/test_iterative_memcpy.o" "15"
+
+	# MEMCPY TEST
+	./compile.sh "tests/test_for_loop_iterative_memcpy.c" "build/test_for_loop_iterative_memcpy.o"
+	# Then we link and test all the files
+	./test.sh "build/test_for_loop_iterative_memcpy.o" "25"
+
+	# MEMCPY TEST
+	./compile.sh "tests/test_for_loop_iterative_memcpy_variable.c" "build/test_for_loop_iterative_memcpy_variable.o"
+	# Then we link and test all the files
+	./test.sh "build/test_for_loop_iterative_memcpy_variable.o" "10"
 
 	echo "Good libc"

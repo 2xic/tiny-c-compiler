@@ -113,6 +113,7 @@ class Ast2Asm:
             for i in node.child_nodes:
                 self.convert_nodes(i, output)
         elif isinstance(node, ReturnDefinition):
+            # TODO: THis should be moved to use the expression function
             if output.is_main:
                 # technically it should only be a exit if this is the main opcode ...
                 if isinstance(node.value, MathOp):
@@ -150,7 +151,7 @@ class Ast2Asm:
         elif isinstance(node, BinaryOperation):
             if node.op =="++":
                 reference_stack = self.parameter_location.get_stack_variable_value(node.expr_1.variable, output)
-                output.append(f"\taddl $1, {reference_stack}", comment="Add the ++ to the reference stack")
+                output.append(f"\taddl $1, {reference_stack}", comment=f"Add the ++ to the reference stack ({node.expr_1.variable})")
             else:
                 raise Exception("what is this? I don't know this op in binary op")            
         elif isinstance(node, FunctionCall):
@@ -311,21 +312,23 @@ class Ast2Asm:
             jne_id = get_conditional_instruction(node.conditional)
             output.append(f"{jne_id} cloop{node.id}")
         elif isinstance(node, ForLoop):
-            copy_of_variables = dict(output.variables_stack_location)
-            copy_offset = int(output.stack_location_offset)
+            copy_of_variables_update = dict(output.variables_stack_location)
+            copy_offset_update = int(output.stack_location_offset)
 
             # Need to check this and then jump ...
             self.convert_nodes(node.initialization_statement, output)
             output.append(f"jmp loop{node.id}")
+
+            copy_of_variables = dict(output.variables_stack_location)
+            copy_offset = int(output.stack_location_offset)
             # Jump to the conditional
             output.append(f"cloop{node.id}:")
             # Parse the body data
             self.convert_nodes(node.body, output)
             self.convert_nodes(node.update_statement, output)
-
             # Reset the stack pointer in case of local variables
             delta = output.stack_location_offset - copy_offset
-            self.reset_stack_pointer(delta * 8, output, "Reset after branch switch")
+            self.reset_stack_pointer(delta * 8, output, f"Reset all local pointers {str(set(output.variables_stack_location.keys()) - set(copy_of_variables.keys()))}")
             # We reset it back
             output.variables_stack_location = copy_of_variables
             output.stack_location_offset = copy_offset        
@@ -336,6 +339,12 @@ class Ast2Asm:
             # Jump to while loop if true
             jne_id = get_conditional_instruction(node.test_expression_statement)
             output.append(f"{jne_id} cloop{node.id}")
+            # Reset after the full scope is done
+            delta = output.stack_location_offset - copy_offset_update
+            self.reset_stack_pointer(delta * 8, output, f"Reset after branch switch {str(set(output.variables_stack_location.keys()) - set(copy_of_variables_update.keys()))}")
+            output.variables_stack_location = copy_of_variables_update
+            output.stack_location_offset = copy_offset_update
+
         elif isinstance(node, ExternalFunctionDefinition):
             pass
         else:
@@ -349,6 +358,7 @@ class Ast2Asm:
             self.handle_math_opcodes(node.expr_1, node.op, math_output, output)                
             self.handle_math_opcodes(node.expr_2, node.op, math_output, output)                
         elif isinstance(node, FunctionCall):
+            # TODO: This should be moved to use the expressions
             # Do a backup and then restore 
             output.append("\tmovl %eax, %edx", comment="Backup current value")
             self.convert_nodes(node, output)

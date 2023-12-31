@@ -24,9 +24,19 @@ struct memory_blocks *last_memory_blocks;
 // WIP THIS section
 
 // NOTE: This is the opposite from the C standard library
-int memcpy(int from_address, int to_address, int size){
+int memcpy(int *from_address, int *to_address, int size) {
     // Copy from source destination to the target
     // TODO: Need a pointer access nodes implemented on the AST side
+
+/*    for(int v = 0; v < size; v++){
+        int value = *from_address;
+        *to_address = value;
+        
+        from_address++;
+        to_address++;
+    }
+*/
+    return 0;
 }
 
 int* free(int *value){
@@ -34,18 +44,22 @@ int* free(int *value){
     // TODO: Wee need memcpy first http://www.danielvik.com/2010/02/fast-memcpy-in-c.html
     
     struct memory_blocks *prev = global_memory_blocks;
+    struct memory_blocks *isLastBlock =global_memory_blocks->next; // Next would be zero ... SO we dereference zero ? 
     int run = 0;
     int count = 0;
     while(run == 0){
-
+        int *adjustedValuePointer = value - 24; // Adjust to start of the block
+        // THis pointer == the free pointer
+        if (prev == adjustedValuePointer){
+            run = 1;
+        }
+        
         struct memory_blocks *current = prev->next;
         if (current == 0){
-            run = 1;            
+            run = 1; // FAILED
         } else {
             count++;
-            struct memory_blocks *current_next = current->next;
-
-            if (current_next == 0){
+            if (current == adjustedValuePointer){
                 run = 1;
             } else {
                 prev = prev->next;
@@ -58,12 +72,17 @@ int* free(int *value){
     */
 
     int oldSize = prev->size;
+    prev->free = 1;
+    
     // Let's reduce the allocation on sbrk now ...
     int MEMORY_BLOCK_SIZE_STRUCT = 24; // TODO: implement sizeof(struct memory_blocks); Currently we allocate one variable = 8
     int current_program_offset = brk(0);
     int delta = current_program_offset - MEMORY_BLOCK_SIZE_STRUCT - oldSize;
 
-    // Remove it from the list 
+    // 
+    //isLastBlock = isLastBlock->next;
+
+    // Remove it from the list (TODO: This should only happen if we are on the last entry ... )
     prev->next = 0;
 
 
@@ -71,8 +90,10 @@ int* free(int *value){
     int value = brk(delta);
 
     if (count == 0){
-        global_memory_blocks = 0;
-        last_memory_blocks = 0;
+        if (isLastBlock == 0){
+            global_memory_blocks = 0;
+            last_memory_blocks = 0;
+        }
     }
 
     if (value == -1){
@@ -92,7 +113,7 @@ int* malloc(int size){
     struct memory_blocks *test = value_ref;
     
     test->size = size;
-    test->free = size;
+    test->free = 0;
     test->next = 0;
     
     if (global_memory_blocks == 0){

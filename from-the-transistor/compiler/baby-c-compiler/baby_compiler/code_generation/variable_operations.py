@@ -211,8 +211,38 @@ class VariableOperations:
                     VariableLocation.from_variable_name(node.left_side, self.parameter_location, self.ast, output),
                     output,
                 ),
-                comment=f"Allocation of variable ({node.right_side.variable.variable})"
+                comment=f"Assignment of variable (&{node.right_side.variable.variable} to {node.left_side})"
             )
+        elif isinstance(node.left_side, VariableAddressDereference):
+            if isinstance(node.right_side, VariableReference):
+                output.append("", comment=f"[Start variable assignment of ({node.right_side.variable} to *{node.left_side.value.variable})]")
+                output.append(
+                    load_value(
+                        VariableLocation.from_variable_name(node.right_side.variable, self.parameter_location, self.ast, output),
+                        Register("rbx"),
+                        output,
+                    ),
+                    comment=f"Load in variable {node.right_side.variable}",
+                )
+                output.append(
+                    load_value(
+                        MemoryLocation(0, VariableLocation.from_variable_address_reference(node.left_side.value.variable, output)),
+                        Register("rax"),
+                        output,
+                    ),
+                    comment=f"Assign the loaded variable to memory {node.left_side.value.variable}",
+                )
+                output.append(
+                    load_value(
+                        Register("rbx"),
+                        MemoryLocation(0, Register("rax")),
+                        output,
+                    ),
+                    comment=f"Assign the loaded variable to memory {node.left_side.value.variable}",
+                )
+                output.append("", comment="[END of variable assignment]")
+            else:
+                raise Exception("UNKNOWN NODE SIR")
         elif isinstance(node.right_side, VariableAddressDereference):
             value = node.right_side.value.variable
             name = node.left_side
