@@ -27,10 +27,9 @@ int main(){
 
     int sizAfterFree = brk(0);
     
-    int delta = sizeBeforeAllocation - sizAfterFree;
     int size = getSize();
 
-    int sum = size + delta;
+    int sum = size;
 
     if (sum == 0){
         return 0;

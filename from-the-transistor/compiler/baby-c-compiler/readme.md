@@ -122,6 +122,9 @@ Mostly to just get an idea of features that people commonly implement for this (
 - https://github.com/Wilfred/babyc#current-feature-set
 - https://www.wilfred.me.uk/blog/2014/08/27/baby-steps-to-a-c-compiler/
 
+## Char
+- Just stored as int internally in the code ... 
+
 ## Floating points
 - https://en.wikibooks.org/wiki/X86_Assembly/Floating_Point
 - https://cs.fit.edu/~mmahoney/cse3101/float.html

@@ -1,6 +1,6 @@
 
-simple:
-	gcc -c -g -Wa,-a,-ad reference/simple.c
+debug:
+	gcc -c -g -Wa,-a,-ad reference/debug.c
 
 multiple_functions:
 	gcc -c -g -Wa,-a,-ad reference/memory_pointers.c

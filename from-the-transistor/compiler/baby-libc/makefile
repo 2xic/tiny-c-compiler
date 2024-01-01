@@ -85,10 +85,14 @@ tests: build_shared_library
 	# Then we link and test all the files
 	./test.sh "build/test_malloc_then_free.o" "0"
 
-	# TODO: FIx this test
-#	./compile.sh "tests/test_malloc_free_a_before_b.c" "build/test_malloc_free_a_before_b.o"
+	# Correct order to a free
+	./compile.sh "tests/test_malloc_free_in_order.c" "build/test_malloc_free_in_order.o"
 	# Then we link and test all the files
-#	./test.sh "build/test_malloc_free_a_before_b.o" "9"
+	./test.sh "build/test_malloc_free_in_order.o" "9"
+
+	./compile.sh "tests/test_malloc_free_a_before_b.c" "build/test_malloc_free_a_before_b.o"
+	# Then we link and test all the files
+	./test.sh "build/test_malloc_free_a_before_b.o" "9"
 
 	# MEMCPY TEST
 	./compile.sh "tests/test_iterative_memcpy.c" "build/test_iterative_memcpy.o"

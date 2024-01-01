@@ -44,19 +44,18 @@ int* free(int *value){
     // TODO: Wee need memcpy first http://www.danielvik.com/2010/02/fast-memcpy-in-c.html
     
     struct memory_blocks *prev = global_memory_blocks;
-    struct memory_blocks *isLastBlock =global_memory_blocks->next; // Next would be zero ... SO we dereference zero ? 
     int run = 0;
     int count = 0;
     while(run == 0){
         int *adjustedValuePointer = value - 24; // Adjust to start of the block
-        // THis pointer == the free pointer
+        // This pointer == the free pointer
         if (prev == adjustedValuePointer){
             run = 1;
         }
-        
+        // If the next pointer is the current pointer then break
         struct memory_blocks *current = prev->next;
         if (current == 0){
-            run = 1; // FAILED
+            run = 2; // FAILED
         } else {
             count++;
             if (current == adjustedValuePointer){
@@ -67,49 +66,50 @@ int* free(int *value){
         }
     }
 
-    /*
-    * TODO: Implement less than equal check here so we only readjust the segment size if the malloc is fully used.
-    */
-
     int oldSize = prev->size;
     prev->free = 1;
-    
-    // Let's reduce the allocation on sbrk now ...
-    int MEMORY_BLOCK_SIZE_STRUCT = 24; // TODO: implement sizeof(struct memory_blocks); Currently we allocate one variable = 8
-    int current_program_offset = brk(0);
-    int delta = current_program_offset - MEMORY_BLOCK_SIZE_STRUCT - oldSize;
 
-    // 
-    //isLastBlock = isLastBlock->next;
+    /**
+     * We could be more fancy here and also merge in allocation etc. after a block is freed
+    */
 
-    // Remove it from the list (TODO: This should only happen if we are on the last entry ... )
-    prev->next = 0;
+    return 0;
+}
 
-
-    // TODO: This should also use sbrk and have it adjusted there
-    int value = brk(delta);
-
-    if (count == 0){
-        if (isLastBlock == 0){
-            global_memory_blocks = 0;
-            last_memory_blocks = 0;
+int *findFreeChunk(int size){
+    // If we find a chunk that is free we can just use that instead ... 
+    struct memory_blocks *current = global_memory_blocks;
+    while(current != 0){
+        int isFree = current->free;
+        // We found a free chunk !
+        if (isFree == 1){
+            int value = current->size;
+            if (value <= size){
+                return current;
+            }
         }
+        current = current->next;
     }
-
-    if (value == -1){
-        return 0;
-    }
-
-
     return 0;
 }
 
 int* malloc(int size){
     int MEMORY_BLOCK_SIZE_STRUCT = 24; // TODO: implement sizeof(struct memory_blocks); Currently we allocate one variable = 8
+
+    int sizeCopy = size; // TODO: fix this call
+    struct memory_blocks *reallocate = findFreeChunk(sizeCopy);
+
+    if (reallocate != 0){
+        reallocate->free = 0;
+        int adjustedPointer = reallocate + 24;
+        return adjustedPointer;
+    }
+
     // We need to allocate
     int total_size = MEMORY_BLOCK_SIZE_STRUCT + size;
 
     int value_ref = sbrk(total_size);
+
     struct memory_blocks *test = value_ref;
     
     test->size = size;
@@ -141,7 +141,10 @@ int getSize(){
     struct memory_blocks *current = global_memory_blocks;
 
     while(current != 0){
-        a++;
+        int isFree = current->free;
+        if (isFree == 0){
+            a = a + 1;
+        }
         current = current->next;
     }
 
@@ -157,8 +160,11 @@ int sumSize(){
     int a = 0;
 
     while(current != 0){
-        int value = current->size;
-        a = a + value;
+        int isFree = current->free;
+        if (isFree == 0){
+            int value = current->size;
+            a = a + value;
+        }
         current = current->next;
     }
 
@@ -171,8 +177,11 @@ int sumFree(){
     int a = 0;
 
     while(current != 0){
-        int value = current->free;
-        a = a + value;
+        int isFree = current->free;
+        if (isFree == 0){
+            int value = current->free;
+            a = a + value;
+        }
         current = current->next;
     }
 
