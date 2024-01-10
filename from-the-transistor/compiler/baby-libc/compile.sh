@@ -18,6 +18,7 @@ out="$loc/asm/${basename}_temp_baby_c.s"
 if [ -z "$3" ]
   then
     echo "No output name specified"
+    echo "python3 -m baby_compiler.compiler \"$loc/$1\" $out"
     cd ../baby-c-compiler/ && python3 -m baby_compiler.compiler "$loc/$1" $out
     status=$?
     if test "$status" = "0"

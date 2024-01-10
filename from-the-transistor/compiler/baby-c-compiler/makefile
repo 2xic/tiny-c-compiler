@@ -19,6 +19,9 @@ run_baby_compiler:
 	ld file.o -o yourprogram.o
 	./yourprogram.o || (echo "Returned with == $$?"; exit 0)
 
+run_optimizer_tests:
+	python3 -m baby_compiler.optimizer_test
+
 run_baby_compiler_tests:
 	# types
 	./assert.sh ./reference/types/simple_struct.c "2"
@@ -127,5 +130,5 @@ run_baby_compiler_tests:
 	# Expressions
 	./assert.sh ./reference/expressions/minus.c "4" ""
 
-tests: run_baby_compiler_tests 
+tests: run_baby_compiler_tests  run_optimizer_tests
 	echo "Good compiler :)"

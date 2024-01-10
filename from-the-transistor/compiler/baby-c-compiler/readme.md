@@ -104,7 +104,14 @@ Resources
         syscall               
         mov %rax, %rbx # Rax now has the end of program segment
         ```
-- 
+
+## Debug utils
+View the generated ast
+```
+python3 -m baby_compiler.plot_ast "./reference/control_flow/while_loops_without_else.c"
+```
+
+![example](./example.png)
 
 ## Asm
 - https://www.cs.mcgill.ca/~cs573/fall2004/classnotes/Assem_Linux.pdf

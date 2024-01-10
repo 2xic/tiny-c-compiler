@@ -4,12 +4,15 @@ from .tokenizer import Tokenizer
 from .ast_2_asm import Ast2Asm
 from .exceptions import InvalidSyntax
 
-def compile(file):
+def get_ast(file_content):
     tokenizer = Tokenizer(
-        file
+        file_content
     )
-
     tree = AST(tokenizer.tokens)
+    return tree
+
+def compile(file_content):
+    tree= get_ast(file_content)
     try:
         file_ast = tree.build_ast()
         asm = Ast2Asm(file_ast) 

@@ -28,20 +28,29 @@ class Nodes:
     def __repr__(self) -> str:
         return self.__str__()
 
-
 class AssignGlobalValues:
     def __init__(self) -> None:
         self.id = 0
 
     def assign_scope(self, node: Nodes):
+        # Should only happened for root node
+        if node.id is None:
+            self._assign(node, None)
         for i in node.child_nodes:
             # TODO: All nodes should use nodes
             if isinstance(i, Nodes):
-                setattr(i, "id", self.id)
-                setattr(i, "parent", node)
-                self.id += 1
+                #setattr(i, "id", self.id)
+                #setattr(i, "parent", node)
+                self._assign(i, node)
+                #self.id += 1
                 self.assign_scope(i)
         return node
+
+    def _assign(self, child_node, current_node):
+        if isinstance(child_node, Nodes):
+            setattr(child_node, "id", self.id)
+            setattr(child_node, "parent", current_node)
+            self.id += 1
 
 """
 AST nodes
@@ -139,6 +148,7 @@ class File(Nodes):
         self.external_functions: Dict[str, ExternalFunctionDefinition] = {}
         self.global_variables = {}
         self.global_types = {}
+        # TODO: This should also use the child_nodes
 
 class VariableDeclaration(Nodes):
     def __init__(self, type: TypeDefinition, name, value) -> None:
@@ -192,17 +202,11 @@ class NumericValue(Nodes):
     def __init__(self, value) -> None:
         super().__init__()
         self.value = value
-        self.child_nodes = [
-            value
-        ]
 
 class StringValue(Nodes):
     def __init__(self, value) -> None:
         super().__init__()
         self.value = value
-        self.child_nodes = [
-            value
-        ]
 
 class Conditionals(Nodes):
     def __init__(self, if_condition, else_condition, else_if_conditions) -> None:
