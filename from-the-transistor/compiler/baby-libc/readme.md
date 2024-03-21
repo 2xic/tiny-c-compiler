@@ -2,11 +2,10 @@ Using our compiler - we should write a [libc](https://en.wikipedia.org/wiki/C_st
 - memcpy
 - memset
 - printf
-- malloc(?)
+- malloc
 
 ## Glibc
 - https://codebrowser.dev/glibc/glibc/stdio-common/sprintf.c.html
-- 
 
 ## Malloc
 Some variants of malloc implementations

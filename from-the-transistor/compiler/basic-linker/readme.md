@@ -1,5 +1,8 @@
+# Linker
+
 The compiler is starting to take shape, let's think some about the linker
 
+### Links
 - https://hzliu123.github.io/linux-kernel/Using%20GNU%20Compiler%20and%20Binutils%20by%20Example.pdf
 - https://stackoverflow.com/a/30507725
   - Linkers work like the solc linker -> Use placeholder and fill them in later
@@ -30,8 +33,7 @@ readelf -l ./elf_file
 - From someone who worked on lld !
 - Combine .text section
 - Combine .data section
-- Resolve synbols
-
+- Resolve symbols
 
 ### [A New ELF Linker](https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/34417.pdf)
 - Someone from Google wrote this

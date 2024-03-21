@@ -1,11 +1,9 @@
-From the transistor I'm supposed to td do the following
-1. Write a C compiler
-- I get most points of doing this :) I'll do this
-3. Build a linker
-- I might skip this one, started on it, but it is not fun. Not feeling it as a project and the other parts are more interesting.  
-4. Implement something like libc + Malloc
-- We have malloc
-5. Add some IR ?
-- https://mcyoung.xyz/2023/08/01/llvm-ir/ has some exampels of the llvm IR.
-- 
+Project I started on before Christmas 2023, will return to it one of these days. 
 
+It's one of the chapters for [From the Transistor to the Web Browser](https://github.com/geohot/fromthetransistor), namely the compiler chapter. I did it in Python instead of Haskell.
+
+| Sub-project                          | Status                           |
+| ------------------------------------ | -------------------------------- |
+| [The C compiler](./baby-c-compiler/) | Can run basic programs           |
+| [The linker](./basic-linker/)        | Skipped it                       |
+| [The baby libc](.//baby-libc/)       | You only get malloc ... for now. |
