@@ -180,18 +180,6 @@ class Ast2Asm:
                     elif isinstance(i, StringValue):
                         raise Exception("Todo handle the string calls")
                     elif isinstance(i, VariableReference):
-                        # You just push the variable location bro
-                        #if "*" in str(i.type):
-                        #    location = output.get_stack_value(i.variable)
-                        #    output.append(
-                        #        f"\tlea {location}, %rax",
-                        #        comment=f"Pushing pointer argument REFERENCE of {i.variable}"
-                        #    )
-                        #    output.append(
-                        #        "\t"+ "pushq %rax",
-                        #        comment=f"Pushing pointer argument REFERENCE of {i.variable}"
-                        #    )
-                        #else:
                         location = output.get_stack_value(i.variable, pushed_offset=pushed_offset)
                         output.append(
                             "\t"+ "pushq " + location,
@@ -444,12 +432,6 @@ class SysWriteMapping:
         assert isinstance(parameters[2], StringValue), "Bad sys write"
         string_value = parameters[2].value
         message_id = f"message{asm_root.message_counter}"
-        # output.append(
-        #     "\txor     %eax, %eax",
-        # )
-        # output.append(
-        #     "\txor     %ebx, %ebx",
-        # )
         asm_root.message_counter += 1
         asm_root.data_sections.append(
             f"\t{message_id}:  .ascii  \"{string_value}\""

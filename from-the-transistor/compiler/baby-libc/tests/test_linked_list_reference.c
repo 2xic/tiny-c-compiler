@@ -1,4 +1,4 @@
-// Put this into the PLT
+// Define it for the linker
 int *malloc(int increment);
 
 struct node

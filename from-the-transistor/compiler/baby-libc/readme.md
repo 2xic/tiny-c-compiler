@@ -1,8 +1,12 @@
+# Baby libc
 Using our compiler - we should write a [libc](https://en.wikipedia.org/wiki/C_standard_library)
-- memcpy
-- memset
-- printf
-- malloc
+
+| Function | Status                                    |
+| -------- | ----------------------------------------- |
+| malloc   | Implemented, but not fully battle tested. |
+| memcpy   | Not started on yet                        |
+| memset   | Not started on yet                        |
+| printf   | Not started on yet                        |
 
 ## Glibc
 - https://codebrowser.dev/glibc/glibc/stdio-common/sprintf.c.html

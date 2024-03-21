@@ -8,7 +8,6 @@ multiple_functions:
 build_asm_simple:
 	gcc -c reference/simple.s -o file.o
 	ld file.o -o yourprogram.o
-#	gcc file.o -o file
 
 baby_compiler_test:
 	python3 -m baby_compiler.tests

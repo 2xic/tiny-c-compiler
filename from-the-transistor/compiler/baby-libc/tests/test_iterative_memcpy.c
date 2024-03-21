@@ -1,6 +1,4 @@
-// Need to handle imports
-
-// Put this into the PLT
+// Define it for the linker
 int *malloc(int increment);
 int free(int *a);
 

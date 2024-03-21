@@ -12,6 +12,7 @@ int* sbrk(int increment) {
     return current_program_offset;
 }
 
+// TODO: Fix the sizeof for these arguments
 struct memory_blocks {
     int free; // 8 (should be 4)
     int size; // 8 (should be 4)
@@ -52,7 +53,7 @@ int* free(int *value){
         if (prev == adjustedValuePointer){
             run = 1;
         }
-        // If the next pointer is the current pointer then break
+        // If the next pointer is the current pointer then break out
         struct memory_blocks *current = prev->next;
         if (current == 0){
             run = 2; // FAILED
@@ -94,9 +95,11 @@ int *findFreeChunk(int size){
 }
 
 int* malloc(int size){
-    int MEMORY_BLOCK_SIZE_STRUCT = 24; // TODO: implement sizeof(struct memory_blocks); Currently we allocate one variable = 8
+    // TODO: implement sizeof(struct memory_blocks); Currently we allocate one variable = 8
+    int MEMORY_BLOCK_SIZE_STRUCT = 24; 
 
-    int sizeCopy = size; // TODO: fix this call
+    // TODO: fix this call
+    int sizeCopy = size; 
     struct memory_blocks *reallocate = findFreeChunk(sizeCopy);
 
     if (reallocate != 0){
@@ -118,17 +121,14 @@ int* malloc(int size){
     
     if (global_memory_blocks == 0){
         global_memory_blocks = test;
-        last_memory_blocks = test; // THIS SHOULD COPY REFERENCE ... IS IT DOING THAT ?
+        last_memory_blocks = test;
     } else {
-        // Memory locations should be zero at this point
         last_memory_blocks->next = test;
         last_memory_blocks = test;
     }
 
     // Move it forward so that we don't overwrite the metadata
     int adjustedPointer = last_memory_blocks + 24;
-
-
     return adjustedPointer;
 }
 

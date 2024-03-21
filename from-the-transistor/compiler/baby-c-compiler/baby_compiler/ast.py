@@ -18,7 +18,7 @@ class Nodes:
         self.parent: Optional[Nodes] = None
 
     def __str__(self) -> str:
-        # lol
+        # TODO: please change this.
         name = getattr(self, "name") if "name" in dir(self) else ""
         if len(name):
             return f"{self.__class__.__name__} ({name}) " + str(self.child_nodes)
