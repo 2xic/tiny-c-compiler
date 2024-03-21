@@ -5,13 +5,14 @@ That said
 - We support control flow with conditionals and loops.
 - Single pointers, but not too fancy double pointers.
 - Function calls and function definitions.
-- Few syscall (write and brk).
-- Few datatype's - mainly int, but with some struct support also. In addition to these pointer variants.
+- Some syscall (write and brk).
+- Some datatype's - mainly int, but with some struct support also. In addition to these pointer variants.
 
 ## TODOS
+- Improve abstraction for the code generation
 - Some low-hanging fruit optimizations with the ASM output
 - Improve the debug information and the test suite (it's very verbose)
-- Floating points
+- Add floating points support
   - https://en.wikibooks.org/wiki/X86_Assembly/Floating_Point
   - https://cs.fit.edu/~mmahoney/cse3101/float.html
   - https://students.mimuw.edu.pl/~zbyszek/asm/en/slides/float.pdf

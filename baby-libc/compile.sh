@@ -12,6 +12,8 @@ fi
 
 loc=$(/usr/bin/pwd)
 basename=$(basename $1)
+mkdir "$loc/asm/"
+mkdir "$loc/build/"
 echo "$loc/${basename}_temp_baby_c.s"
 out="$loc/asm/${basename}_temp_baby_c.s"
 

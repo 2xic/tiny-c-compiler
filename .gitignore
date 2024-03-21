@@ -1,0 +1,6 @@
+*.o
+*.s
+__pycache__
+.env
+*.bin
+.snapshots
